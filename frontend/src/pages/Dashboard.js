@@ -39,6 +39,7 @@ export default function Dashboard({ user, onLogout, token }) {
   const [filterCategory, setFilterCategory] = useState('all');
   const [filterPriority, setFilterPriority] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [analyticsView, setAnalyticsView] = useState('weekly');
   const [formData, setFormData] = useState({
     title: '',
     description: '',
