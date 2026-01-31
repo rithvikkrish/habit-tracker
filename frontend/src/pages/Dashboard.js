@@ -184,6 +184,111 @@ export default function Dashboard({ user, onLogout, token }) {
     completed: tasks.filter(t => t.status === 'completed').length
   };
 
+  // Analytics calculations
+  const getDateRange = (view) => {
+    const now = new Date();
+    const ranges = {
+      weekly: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000),
+      monthly: new Date(now.getFullYear(), now.getMonth(), 1),
+      yearly: new Date(now.getFullYear(), 0, 1)
+    };
+    return ranges[view];
+  };
+
+  const getAnalyticsData = () => {
+    const startDate = getDateRange(analyticsView);
+    const filteredTasks = tasks.filter(task => {
+      const taskDate = new Date(task.created_at);
+      return taskDate >= startDate;
+    });
+
+    // Completion rate data
+    const completionData = [
+      { name: 'Completed', value: filteredTasks.filter(t => t.status === 'completed').length, color: '#10B981' },
+      { name: 'In Progress', value: filteredTasks.filter(t => t.status === 'in-progress').length, color: '#3B82F6' },
+      { name: 'To Do', value: filteredTasks.filter(t => t.status === 'todo').length, color: '#6B7280' }
+    ];
+
+    // Category distribution
+    const categoryData = categories.map(cat => ({
+      name: cat.name,
+      value: filteredTasks.filter(t => t.category === cat.name).length,
+      color: cat.color
+    })).filter(c => c.value > 0);
+
+    // Priority distribution
+    const priorityData = [
+      { name: 'High', value: filteredTasks.filter(t => t.priority === 'High').length, color: '#EF4444' },
+      { name: 'Medium', value: filteredTasks.filter(t => t.priority === 'Medium').length, color: '#F97316' },
+      { name: 'Low', value: filteredTasks.filter(t => t.priority === 'Low').length, color: '#10B981' }
+    ].filter(p => p.value > 0);
+
+    // Trend data
+    const getTrendData = () => {
+      const now = new Date();
+      const data = [];
+      
+      if (analyticsView === 'weekly') {
+        for (let i = 6; i >= 0; i--) {
+          const date = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+          const dayTasks = tasks.filter(t => {
+            const taskDate = new Date(t.created_at);
+            return taskDate.toDateString() === date.toDateString();
+          });
+          data.push({
+            name: date.toLocaleDateString('en-US', { weekday: 'short' }),
+            completed: dayTasks.filter(t => t.status === 'completed').length,
+            created: dayTasks.length
+          });
+        }
+      } else if (analyticsView === 'monthly') {
+        const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+        const weeks = Math.ceil(daysInMonth / 7);
+        for (let i = 0; i < weeks; i++) {
+          const weekStart = new Date(now.getFullYear(), now.getMonth(), i * 7 + 1);
+          const weekEnd = new Date(now.getFullYear(), now.getMonth(), Math.min((i + 1) * 7, daysInMonth));
+          const weekTasks = tasks.filter(t => {
+            const taskDate = new Date(t.created_at);
+            return taskDate >= weekStart && taskDate <= weekEnd;
+          });
+          data.push({
+            name: `Week ${i + 1}`,
+            completed: weekTasks.filter(t => t.status === 'completed').length,
+            created: weekTasks.length
+          });
+        }
+      } else {
+        for (let i = 0; i < 12; i++) {
+          const monthTasks = tasks.filter(t => {
+            const taskDate = new Date(t.created_at);
+            return taskDate.getMonth() === i && taskDate.getFullYear() === now.getFullYear();
+          });
+          data.push({
+            name: new Date(now.getFullYear(), i).toLocaleDateString('en-US', { month: 'short' }),
+            completed: monthTasks.filter(t => t.status === 'completed').length,
+            created: monthTasks.length
+          });
+        }
+      }
+      return data;
+    };
+
+    const completionRate = filteredTasks.length > 0 
+      ? Math.round((filteredTasks.filter(t => t.status === 'completed').length / filteredTasks.length) * 100)
+      : 0;
+
+    return {
+      completionData: completionData.filter(d => d.value > 0),
+      categoryData,
+      priorityData,
+      trendData: getTrendData(),
+      completionRate,
+      totalTasks: filteredTasks.length
+    };
+  };
+
+  const analytics = getAnalyticsData();
+
   return (
     <div className="min-h-screen" style={{ background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)' }}>
       {/* Header */}
