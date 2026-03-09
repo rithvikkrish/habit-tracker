@@ -1,824 +1,351 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { toast } from 'sonner';
-import { Plus, LogOut, CheckCircle2, Circle, Clock, Trash2, Edit, Filter, TrendingUp, Calendar } from 'lucide-react';
-import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, BarChart, Bar } from 'recharts';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
 
-const priorityColors = {
-  Low: 'bg-green-100 text-green-800 border-green-300',
-  Medium: 'bg-orange-100 text-orange-800 border-orange-300',
-  High: 'bg-red-100 text-red-800 border-red-300'
-};
+const api = axios.create({ baseURL: BACKEND_URL });
+api.interceptors.request.use(cfg => {
+  const token = localStorage.getItem('token');
+  if (token) cfg.headers.Authorization = `Bearer ${token}`;
+  return cfg;
+});
 
-const statusConfig = {
-  todo: { label: 'To Do', icon: Circle, color: 'text-gray-500' },
-  'in-progress': { label: 'In Progress', icon: Clock, color: 'text-blue-500' },
-  completed: { label: 'Completed', icon: CheckCircle2, color: 'text-green-500' }
-};
-
-export default function Dashboard({ user, onLogout, token }) {
+export default function Dashboard() {
+  const [user] = useState(() => JSON.parse(localStorage.getItem('user') || '{}'));
   const [tasks, setTasks] = useState([]);
   const [categories, setCategories] = useState([]);
   const [dailyQuote, setDailyQuote] = useState(null);
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [selectedTask, setSelectedTask] = useState(null);
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [filterCategory, setFilterCategory] = useState('all');
-  const [filterPriority, setFilterPriority] = useState('all');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [analyticsView, setAnalyticsView] = useState('weekly');
-  const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    category: '',
-    priority: 'Medium',
-    due_date: '',
-    status: 'todo'
-  });
+  const [activeTab, setActiveTab] = useState('tasks');
+  const [showAddTask, setShowAddTask] = useState(false);
+  const [newTask, setNewTask] = useState({ title: '', description: '', category: 'Work', priority: 'medium', status: 'todo' });
+  const [habits, setHabits] = useState(() => JSON.parse(localStorage.getItem('habits') || '[]'));
+  const [newHabit, setNewHabit] = useState('');
+  const [habitEmoji, setHabitEmoji] = useState('⭐');
+
+  const fetchTasks = async () => {
+    try { const r = await api.get('/api/tasks'); setTasks(r.data); } catch {}
+  };
+  const fetchCategories = async () => {
+    try { const r = await api.get('/api/categories'); setCategories(r.data); } catch {}
+  };
+  const fetchDailyQuote = async () => {
+    try { const r = await api.get('/api/daily-quote'); setDailyQuote(r.data); } catch {}
+  };
 
   useEffect(() => {
     fetchTasks();
     fetchCategories();
     fetchDailyQuote();
-  }, []);
+    const interval = setInterval(fetchDailyQuote, 60 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const fetchTasks = async () => {
-    try {
-      const response = await axios.get(`${API}/tasks`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setTasks(response.data);
-    } catch (error) {
-      toast.error('Failed to fetch tasks');
-    }
-  };
+  const logout = () => { localStorage.clear(); window.location.href = '/auth'; };
 
-  const fetchCategories = async () => {
-    try {
-      const response = await axios.get(`${API}/categories`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setCategories(response.data);
-      if (response.data.length > 0) {
-        setFormData(prev => ({ ...prev, category: response.data[0].name }));
-      }
-    } catch (error) {
-      toast.error('Failed to fetch categories');
-    }
-  };
-
-  const fetchDailyQuote = async () => {
-    try {
-      const response = await axios.get(`${API}/daily-quote`);
-      setDailyQuote(response.data);
-    } catch (error) {
-      console.error('Failed to fetch daily quote');
-    }
-  };
-
-  const handleAddTask = async (e) => {
+  const addTask = async (e) => {
     e.preventDefault();
     try {
-      await axios.post(`${API}/tasks`, formData, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      toast.success('Task created successfully!');
-      setIsAddDialogOpen(false);
-      resetForm();
+      await api.post('/api/tasks', newTask);
+      setNewTask({ title: '', description: '', category: 'Work', priority: 'medium', status: 'todo' });
+      setShowAddTask(false);
       fetchTasks();
-    } catch (error) {
-      toast.error('Failed to create task');
-    }
+    } catch {}
   };
 
-  const handleEditTask = async (e) => {
-    e.preventDefault();
-    try {
-      await axios.put(`${API}/tasks/${selectedTask.id}`, formData, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      toast.success('Task updated successfully!');
-      setIsEditDialogOpen(false);
-      setSelectedTask(null);
-      resetForm();
-      fetchTasks();
-    } catch (error) {
-      toast.error('Failed to update task');
-    }
+  const updateTaskStatus = async (taskId, status) => {
+    try { await api.put(`/api/tasks/${taskId}`, { status }); fetchTasks(); } catch {}
   };
 
-  const handleDeleteTask = async (taskId) => {
-    try {
-      await axios.delete(`${API}/tasks/${taskId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      toast.success('Task deleted successfully!');
-      fetchTasks();
-    } catch (error) {
-      toast.error('Failed to delete task');
-    }
+  const deleteTask = async (taskId) => {
+    try { await api.delete(`/api/tasks/${taskId}`); fetchTasks(); } catch {}
   };
 
-  const handleToggleStatus = async (task) => {
-    const newStatus = task.status === 'completed' ? 'todo' : 'completed';
-    try {
-      await axios.put(`${API}/tasks/${task.id}`, { status: newStatus }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      fetchTasks();
-      toast.success(`Task marked as ${newStatus === 'completed' ? 'completed' : 'incomplete'}`);
-    } catch (error) {
-      toast.error('Failed to update task');
-    }
+  const addHabit = () => {
+    if (!newHabit.trim()) return;
+    const habit = { id: Date.now(), name: newHabit, emoji: habitEmoji, streak: 0, history: [] };
+    const updated = [...habits, habit];
+    setHabits(updated);
+    localStorage.setItem('habits', JSON.stringify(updated));
+    setNewHabit('');
   };
 
-  const openEditDialog = (task) => {
-    setSelectedTask(task);
-    setFormData({
-      title: task.title,
-      description: task.description,
-      category: task.category,
-      priority: task.priority,
-      due_date: task.due_date || '',
-      status: task.status
+  const toggleHabitToday = (id) => {
+    const today = new Date().toISOString().split('T')[0];
+    const updated = habits.map(h => {
+      if (h.id !== id) return h;
+      const done = h.history.includes(today);
+      const history = done ? h.history.filter(d => d !== today) : [...h.history, today];
+      const streak = calculateStreak(history);
+      return { ...h, history, streak };
     });
-    setIsEditDialogOpen(true);
+    setHabits(updated);
+    localStorage.setItem('habits', JSON.stringify(updated));
   };
 
-  const resetForm = () => {
-    setFormData({
-      title: '',
-      description: '',
-      category: categories[0]?.name || '',
-      priority: 'Medium',
-      due_date: '',
-      status: 'todo'
+  const calculateStreak = (history) => {
+    let streak = 0;
+    const today = new Date();
+    for (let i = 0; i < 30; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() - i);
+      if (history.includes(d.toISOString().split('T')[0])) streak++;
+      else break;
+    }
+    return streak;
+  };
+
+  const deleteHabit = (id) => {
+    const updated = habits.filter(h => h.id !== id);
+    setHabits(updated);
+    localStorage.setItem('habits', JSON.stringify(updated));
+  };
+
+  const getLast7Days = () => {
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - (6 - i));
+      return d.toISOString().split('T')[0];
     });
   };
 
-  const filteredTasks = tasks.filter(task => {
-    if (filterStatus !== 'all' && task.status !== filterStatus) return false;
-    if (filterCategory !== 'all' && task.category !== filterCategory) return false;
-    if (filterPriority !== 'all' && task.priority !== filterPriority) return false;
-    if (searchQuery && !task.title.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-    return true;
-  });
+  const completedTasks = tasks.filter(t => t.status === 'done').length;
+  const totalTasks = tasks.length;
 
-  const taskStats = {
-    total: tasks.length,
-    todo: tasks.filter(t => t.status === 'todo').length,
-    inProgress: tasks.filter(t => t.status === 'in-progress').length,
-    completed: tasks.filter(t => t.status === 'completed').length
+  const s = {
+    app: { minHeight: '100vh', background: 'linear-gradient(135deg, #0f0c29, #302b63, #24243e)', fontFamily: "'Outfit', sans-serif", color: '#fff' },
+    navbar: { background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(255,255,255,0.08)', padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '60px' },
+    main: { maxWidth: '1100px', margin: '0 auto', padding: '24px 20px' },
+    card: { background: 'rgba(255,255,255,0.06)', backdropFilter: 'blur(10px)', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.08)', padding: '20px' },
+    btn: { background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', border: 'none', borderRadius: '10px', color: '#fff', padding: '10px 20px', cursor: 'pointer', fontWeight: '600', fontSize: '0.9rem' },
+    input: { width: '100%', padding: '10px 14px', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '10px', color: '#fff', fontSize: '0.9rem', outline: 'none', boxSizing: 'border-box' },
+    select: { padding: '10px 14px', background: 'rgba(30,27,75,0.8)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '10px', color: '#fff', fontSize: '0.9rem', outline: 'none' },
   };
 
-  // Analytics calculations
-  const getDateRange = (view) => {
-    const now = new Date();
-    const ranges = {
-      weekly: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000),
-      monthly: new Date(now.getFullYear(), now.getMonth(), 1),
-      yearly: new Date(now.getFullYear(), 0, 1)
-    };
-    return ranges[view];
-  };
-
-  const getAnalyticsData = () => {
-    const startDate = getDateRange(analyticsView);
-    const filteredTasks = tasks.filter(task => {
-      const taskDate = new Date(task.created_at);
-      return taskDate >= startDate;
-    });
-
-    // Completion rate data
-    const completionData = [
-      { name: 'Completed', value: filteredTasks.filter(t => t.status === 'completed').length, color: '#10B981' },
-      { name: 'In Progress', value: filteredTasks.filter(t => t.status === 'in-progress').length, color: '#3B82F6' },
-      { name: 'To Do', value: filteredTasks.filter(t => t.status === 'todo').length, color: '#6B7280' }
-    ];
-
-    // Category distribution
-    const categoryData = categories.map(cat => ({
-      name: cat.name,
-      value: filteredTasks.filter(t => t.category === cat.name).length,
-      color: cat.color
-    })).filter(c => c.value > 0);
-
-    // Priority distribution
-    const priorityData = [
-      { name: 'High', value: filteredTasks.filter(t => t.priority === 'High').length, color: '#EF4444' },
-      { name: 'Medium', value: filteredTasks.filter(t => t.priority === 'Medium').length, color: '#F97316' },
-      { name: 'Low', value: filteredTasks.filter(t => t.priority === 'Low').length, color: '#10B981' }
-    ].filter(p => p.value > 0);
-
-    // Trend data
-    const getTrendData = () => {
-      const now = new Date();
-      const data = [];
-      
-      if (analyticsView === 'weekly') {
-        for (let i = 6; i >= 0; i--) {
-          const date = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
-          const dayTasks = tasks.filter(t => {
-            const taskDate = new Date(t.created_at);
-            return taskDate.toDateString() === date.toDateString();
-          });
-          data.push({
-            name: date.toLocaleDateString('en-US', { weekday: 'short' }),
-            completed: dayTasks.filter(t => t.status === 'completed').length,
-            created: dayTasks.length
-          });
-        }
-      } else if (analyticsView === 'monthly') {
-        const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-        const weeks = Math.ceil(daysInMonth / 7);
-        for (let i = 0; i < weeks; i++) {
-          const weekStart = new Date(now.getFullYear(), now.getMonth(), i * 7 + 1);
-          const weekEnd = new Date(now.getFullYear(), now.getMonth(), Math.min((i + 1) * 7, daysInMonth));
-          const weekTasks = tasks.filter(t => {
-            const taskDate = new Date(t.created_at);
-            return taskDate >= weekStart && taskDate <= weekEnd;
-          });
-          data.push({
-            name: `Week ${i + 1}`,
-            completed: weekTasks.filter(t => t.status === 'completed').length,
-            created: weekTasks.length
-          });
-        }
-      } else {
-        for (let i = 0; i < 12; i++) {
-          const monthTasks = tasks.filter(t => {
-            const taskDate = new Date(t.created_at);
-            return taskDate.getMonth() === i && taskDate.getFullYear() === now.getFullYear();
-          });
-          data.push({
-            name: new Date(now.getFullYear(), i).toLocaleDateString('en-US', { month: 'short' }),
-            completed: monthTasks.filter(t => t.status === 'completed').length,
-            created: monthTasks.length
-          });
-        }
-      }
-      return data;
-    };
-
-    const completionRate = filteredTasks.length > 0 
-      ? Math.round((filteredTasks.filter(t => t.status === 'completed').length / filteredTasks.length) * 100)
-      : 0;
-
-    return {
-      completionData: completionData.filter(d => d.value > 0),
-      categoryData,
-      priorityData,
-      trendData: getTrendData(),
-      completionRate,
-      totalTasks: filteredTasks.length
-    };
-  };
-
-  const analytics = getAnalyticsData();
+  const priorityColor = { high: '#ef4444', medium: '#f59e0b', low: '#10b981' };
+  const statusColor = { todo: '#6366f1', 'in-progress': '#f59e0b', done: '#10b981' };
+  const emojis = ['⭐', '💪', '📚', '🏃', '💧', '🧘', '🎯', '🍎', '😴', '✍️'];
 
   return (
-    <div className="min-h-screen" style={{ background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)' }}>
-      {/* Header */}
-      <header className="border-b bg-white shadow-sm">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold" style={{ fontFamily: 'Outfit, sans-serif', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-            TaskMaster
-          </h1>
-          <div className="flex items-center gap-4">
-            <span className="text-sm font-medium" data-testid="user-name">Hi, {user?.name}</span>
-            <Button variant="outline" size="sm" onClick={onLogout} data-testid="logout-button">
-              <LogOut className="w-4 h-4 mr-2" />
-              Logout
-            </Button>
-          </div>
+    <div style={s.app}>
+      {/* Navbar */}
+      <nav style={s.navbar}>
+        <span style={{ fontWeight: '800', fontSize: '1.2rem', background: 'linear-gradient(135deg, #6366f1, #a78bfa)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+          TaskMaster
+        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.875rem' }}>Hey, {user.name || 'User'} 👋</span>
+          <button onClick={logout} style={{ ...s.btn, background: 'rgba(255,255,255,0.08)', padding: '8px 16px', fontSize: '0.8rem' }}>Logout</button>
         </div>
-      </header>
+      </nav>
 
-      <main className="container mx-auto px-4 py-8 space-y-8">
-        {/* Daily Quote Section */}
+      <div style={s.main}>
+        {/* Quote Card */}
         {dailyQuote && (
-          <Card className="overflow-hidden border-2" style={{ borderColor: '#8B5CF6' }} data-testid="daily-quote-card">
-            <div className="flex flex-col md:flex-row">
-              <div className="md:w-1/3 relative">
-                <img
-                  src={dailyQuote.image_url}
-                  alt={dailyQuote.character}
-                  className="w-full h-full object-cover"
-                  style={{ minHeight: '200px', maxHeight: '300px' }}
-                />
-              </div>
-              <div className="md:w-2/3 p-6 flex flex-col justify-center" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
-                <h3 className="text-sm font-semibold text-white/90 mb-2" style={{ fontFamily: 'Outfit, sans-serif' }}>TODAY'S MOTIVATION</h3>
-                <p className="text-2xl md:text-3xl font-bold text-white mb-3" style={{ fontFamily: 'Outfit, sans-serif' }} data-testid="daily-quote-text">
-                  "{dailyQuote.quote}"
-                </p>
-                <p className="text-lg text-white/90 font-medium" data-testid="daily-quote-character">- {dailyQuote.character}</p>
-              </div>
-            </div>
-          </Card>
-        )}
-
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card data-testid="stat-total">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-gray-600">Total Tasks</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold" style={{ color: '#8B5CF6' }}>{taskStats.total}</div>
-            </CardContent>
-          </Card>
-          <Card data-testid="stat-todo">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-gray-600">To Do</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-gray-700">{taskStats.todo}</div>
-            </CardContent>
-          </Card>
-          <Card data-testid="stat-inprogress">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-gray-600">In Progress</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-blue-600">{taskStats.inProgress}</div>
-            </CardContent>
-          </Card>
-          <Card data-testid="stat-completed">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-gray-600">Completed</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-green-600">{taskStats.completed}</div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Analytics Section */}
-        <Card className="overflow-hidden border-2" style={{ borderColor: '#06B6D4' }}>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-2xl" style={{ fontFamily: 'Outfit, sans-serif' }}>
-                  <TrendingUp className="w-6 h-6 inline mr-2" />
-                  Analytics Dashboard
-                </CardTitle>
-                <CardDescription className="mt-1">Track your productivity over time</CardDescription>
-              </div>
-              <Tabs value={analyticsView} onValueChange={setAnalyticsView} className="w-auto">
-                <TabsList>
-                  <TabsTrigger value="weekly" data-testid="analytics-weekly">Weekly</TabsTrigger>
-                  <TabsTrigger value="monthly" data-testid="analytics-monthly">Monthly</TabsTrigger>
-                  <TabsTrigger value="yearly" data-testid="analytics-yearly">Yearly</TabsTrigger>
-                </TabsList>
-              </Tabs>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Completion Circle */}
-              <Card className="bg-gradient-to-br from-purple-50 to-purple-100">
-                <CardHeader>
-                  <CardTitle className="text-lg">Completion Rate</CardTitle>
-                </CardHeader>
-                <CardContent className="flex flex-col items-center">
-                  <div className="relative" style={{ width: 200, height: 200 }}>
-                    <ResponsiveContainer>
-                      <PieChart>
-                        <Pie
-                          data={analytics.completionData}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={60}
-                          outerRadius={80}
-                          paddingAngle={5}
-                          dataKey="value"
-                        >
-                          {analytics.completionData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
-                          ))}
-                        </Pie>
-                      </PieChart>
-                    </ResponsiveContainer>
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="text-center">
-                        <div className="text-4xl font-bold" style={{ color: '#8B5CF6' }}>{analytics.completionRate}%</div>
-                        <div className="text-sm text-gray-600">Complete</div>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="mt-4 space-y-2 w-full">
-                    {analytics.completionData.map((item, index) => (
-                      <div key={index} className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></div>
-                          <span className="text-sm">{item.name}</span>
-                        </div>
-                        <span className="text-sm font-semibold">{item.value}</span>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Category Distribution */}
-              {analytics.categoryData.length > 0 && (
-                <Card className="bg-gradient-to-br from-cyan-50 to-cyan-100">
-                  <CardHeader>
-                    <CardTitle className="text-lg">Tasks by Category</CardTitle>
-                  </CardHeader>
-                  <CardContent className="flex flex-col items-center">
-                    <div style={{ width: 200, height: 200 }}>
-                      <ResponsiveContainer>
-                        <PieChart>
-                          <Pie
-                            data={analytics.categoryData}
-                            cx="50%"
-                            cy="50%"
-                            outerRadius={80}
-                            dataKey="value"
-                            label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                          >
-                            {analytics.categoryData.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={entry.color} />
-                            ))}
-                          </Pie>
-                        </PieChart>
-                      </ResponsiveContainer>
-                    </div>
-                    <div className="mt-4 space-y-2 w-full">
-                      {analytics.categoryData.map((item, index) => (
-                        <div key={index} className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></div>
-                            <span className="text-sm">{item.name}</span>
-                          </div>
-                          <span className="text-sm font-semibold">{item.value}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Priority Breakdown */}
-              {analytics.priorityData.length > 0 && (
-                <Card className="bg-gradient-to-br from-orange-50 to-orange-100">
-                  <CardHeader>
-                    <CardTitle className="text-lg">Priority Distribution</CardTitle>
-                  </CardHeader>
-                  <CardContent className="flex flex-col items-center">
-                    <div style={{ width: 200, height: 200 }}>
-                      <ResponsiveContainer>
-                        <PieChart>
-                          <Pie
-                            data={analytics.priorityData}
-                            cx="50%"
-                            cy="50%"
-                            outerRadius={80}
-                            dataKey="value"
-                          >
-                            {analytics.priorityData.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={entry.color} />
-                            ))}
-                          </Pie>
-                        </PieChart>
-                      </ResponsiveContainer>
-                    </div>
-                    <div className="mt-4 space-y-2 w-full">
-                      {analytics.priorityData.map((item, index) => (
-                        <div key={index} className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></div>
-                            <span className="text-sm">{item.name}</span>
-                          </div>
-                          <span className="text-sm font-semibold">{item.value}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-
-            {/* Trend Chart */}
-            <Card className="mt-6 bg-gradient-to-br from-green-50 to-green-100">
-              <CardHeader>
-                <CardTitle className="text-lg">
-                  <Calendar className="w-5 h-5 inline mr-2" />
-                  Task Trends - {analyticsView.charAt(0).toUpperCase() + analyticsView.slice(1)} View
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div style={{ width: '100%', height: 300 }}>
-                  <ResponsiveContainer>
-                    <LineChart data={analytics.trendData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" />
-                      <YAxis />
-                      <Tooltip />
-                      <Legend />
-                      <Line type="monotone" dataKey="created" stroke="#8B5CF6" strokeWidth={2} name="Created" />
-                      <Line type="monotone" dataKey="completed" stroke="#10B981" strokeWidth={2} name="Completed" />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-          </CardContent>
-        </Card>
-
-        {/* Filters and Add Button */}
-        <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
-          <div className="flex flex-wrap gap-3">
-            <Input
-              placeholder="Search tasks..."
-              className="w-64"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              data-testid="search-input"
+          <div style={{ ...s.card, marginBottom: '24px', display: 'flex', gap: '20px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <img
+              src={dailyQuote.image_url}
+              alt={dailyQuote.character}
+              style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover', border: '3px solid rgba(99,102,241,0.5)', flexShrink: 0 }}
+              onError={e => { e.target.style.display = 'none'; }}
             />
-            <Select value={filterStatus} onValueChange={setFilterStatus}>
-              <SelectTrigger className="w-40" data-testid="filter-status">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="todo">To Do</SelectItem>
-                <SelectItem value="in-progress">In Progress</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={filterCategory} onValueChange={setFilterCategory}>
-              <SelectTrigger className="w-40" data-testid="filter-category">
-                <SelectValue placeholder="Category" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                {categories.map(cat => (
-                  <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={filterPriority} onValueChange={setFilterPriority}>
-              <SelectTrigger className="w-40" data-testid="filter-priority">
-                <SelectValue placeholder="Priority" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Priority</SelectItem>
-                <SelectItem value="Low">Low</SelectItem>
-                <SelectItem value="Medium">Medium</SelectItem>
-                <SelectItem value="High">High</SelectItem>
-              </SelectContent>
-            </Select>
+            <div style={{ flex: 1, minWidth: '200px' }}>
+              <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem', margin: '0 0 6px', textTransform: 'uppercase', letterSpacing: '1px' }}>{dailyQuote.character}</p>
+              <p style={{ color: '#fff', fontSize: '1rem', fontStyle: 'italic', margin: 0, lineHeight: '1.6' }}>"{dailyQuote.quote}"</p>
+            </div>
           </div>
-          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-            <DialogTrigger asChild>
-              <Button style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }} data-testid="add-task-button">
-                <Plus className="w-4 h-4 mr-2" />
-                Add Task
-              </Button>
-            </DialogTrigger>
-            <DialogContent data-testid="add-task-dialog">
-              <DialogHeader>
-                <DialogTitle>Create New Task</DialogTitle>
-                <DialogDescription>Add a new task to your list</DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleAddTask} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="title">Title</Label>
-                  <Input
-                    id="title"
-                    data-testid="task-title-input"
-                    value={formData.title}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea
-                    id="description"
-                    data-testid="task-description-input"
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Category</Label>
-                    <Select value={formData.category} onValueChange={(val) => setFormData({ ...formData, category: val })}>
-                      <SelectTrigger data-testid="task-category-select">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {categories.map(cat => (
-                          <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Priority</Label>
-                    <Select value={formData.priority} onValueChange={(val) => setFormData({ ...formData, priority: val })}>
-                      <SelectTrigger data-testid="task-priority-select">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Low">Low</SelectItem>
-                        <SelectItem value="Medium">Medium</SelectItem>
-                        <SelectItem value="High">High</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="due_date">Due Date</Label>
-                  <Input
-                    id="due_date"
-                    type="date"
-                    data-testid="task-duedate-input"
-                    value={formData.due_date}
-                    onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
-                  />
-                </div>
-                <DialogFooter>
-                  <Button type="submit" data-testid="create-task-button" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>Create Task</Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
+        )}
+
+        {/* Stats */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+          {[
+            { label: 'Total Tasks', value: totalTasks, icon: '📋' },
+            { label: 'Completed', value: completedTasks, icon: '✅' },
+            { label: 'Habits', value: habits.length, icon: '🔥' },
+            { label: 'Categories', value: categories.length, icon: '🗂️' },
+          ].map(stat => (
+            <div key={stat.label} style={{ ...s.card, textAlign: 'center' }}>
+              <div style={{ fontSize: '1.8rem', marginBottom: '6px' }}>{stat.icon}</div>
+              <div style={{ fontSize: '1.6rem', fontWeight: '800', color: '#a78bfa' }}>{stat.value}</div>
+              <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)' }}>{stat.label}</div>
+            </div>
+          ))}
         </div>
 
-        {/* Tasks List */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredTasks.map(task => {
-            const StatusIcon = statusConfig[task.status].icon;
-            return (
-              <Card key={task.id} className="hover:shadow-lg transition-shadow" data-testid={`task-card-${task.id}`}>
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <CardTitle className="text-lg font-semibold mb-2" style={{ fontFamily: 'Outfit, sans-serif' }}>
-                        {task.title}
-                      </CardTitle>
-                      <div className="flex gap-2 flex-wrap">
-                        <Badge variant="outline" className={priorityColors[task.priority]}>
-                          {task.priority}
-                        </Badge>
-                        <Badge variant="outline" style={{ borderColor: categories.find(c => c.name === task.category)?.color }}>
-                          {task.category}
-                        </Badge>
+        {/* Tabs */}
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' }}>
+          {['tasks', 'habits', 'analytics'].map(tab => (
+            <button key={tab} onClick={() => setActiveTab(tab)} style={{
+              padding: '8px 20px', borderRadius: '10px', border: 'none', cursor: 'pointer', fontWeight: '600', fontSize: '0.875rem', textTransform: 'capitalize',
+              background: activeTab === tab ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : 'rgba(255,255,255,0.06)',
+              color: activeTab === tab ? '#fff' : 'rgba(255,255,255,0.5)',
+            }}>{tab}</button>
+          ))}
+        </div>
+
+        {/* TASKS TAB */}
+        {activeTab === 'tasks' && (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+              <h2 style={{ margin: 0, fontSize: '1.2rem' }}>My Tasks</h2>
+              <button onClick={() => setShowAddTask(!showAddTask)} style={s.btn}>+ Add Task</button>
+            </div>
+
+            {showAddTask && (
+              <form onSubmit={addTask} style={{ ...s.card, marginBottom: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <input style={s.input} placeholder="Task title" value={newTask.title} onChange={e => setNewTask({ ...newTask, title: e.target.value })} required />
+                <input style={s.input} placeholder="Description (optional)" value={newTask.description} onChange={e => setNewTask({ ...newTask, description: e.target.value })} />
+                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                  <select style={s.select} value={newTask.category} onChange={e => setNewTask({ ...newTask, category: e.target.value })}>
+                    {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                  </select>
+                  <select style={s.select} value={newTask.priority} onChange={e => setNewTask({ ...newTask, priority: e.target.value })}>
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                  </select>
+                </div>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button type="submit" style={s.btn}>Add Task</button>
+                  <button type="button" onClick={() => setShowAddTask(false)} style={{ ...s.btn, background: 'rgba(255,255,255,0.08)' }}>Cancel</button>
+                </div>
+              </form>
+            )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {tasks.length === 0 && <div style={{ ...s.card, textAlign: 'center', color: 'rgba(255,255,255,0.4)' }}>No tasks yet! Add your first task above.</div>}
+              {tasks.map(task => (
+                <div key={task.id} style={{ ...s.card, display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                  <div style={{ flex: 1, minWidth: '150px' }}>
+                    <p style={{ margin: '0 0 4px', fontWeight: '600', textDecoration: task.status === 'done' ? 'line-through' : 'none', color: task.status === 'done' ? 'rgba(255,255,255,0.3)' : '#fff' }}>{task.title}</p>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: '6px', background: `${priorityColor[task.priority]}22`, color: priorityColor[task.priority] }}>{task.priority}</span>
+                      <span style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: '6px', background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.5)' }}>{task.category}</span>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <select
+                      value={task.status}
+                      onChange={e => updateTaskStatus(task.id, e.target.value)}
+                      style={{ ...s.select, padding: '6px 10px', fontSize: '0.8rem', color: statusColor[task.status] }}
+                    >
+                      <option value="todo">Todo</option>
+                      <option value="in-progress">In Progress</option>
+                      <option value="done">Done</option>
+                    </select>
+                    <button onClick={() => deleteTask(task.id)} style={{ background: 'rgba(239,68,68,0.15)', border: 'none', borderRadius: '8px', color: '#ef4444', padding: '6px 10px', cursor: 'pointer' }}>🗑️</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* HABITS TAB */}
+        {activeTab === 'habits' && (
+          <div>
+            <h2 style={{ marginBottom: '16px', fontSize: '1.2rem' }}>My Habits</h2>
+            <div style={{ ...s.card, marginBottom: '16px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                {emojis.map(e => (
+                  <button key={e} onClick={() => setHabitEmoji(e)} style={{ background: habitEmoji === e ? 'rgba(99,102,241,0.3)' : 'transparent', border: habitEmoji === e ? '1px solid #6366f1' : '1px solid transparent', borderRadius: '8px', padding: '4px 8px', cursor: 'pointer', fontSize: '1.2rem' }}>{e}</button>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: '10px', flex: 1, minWidth: '200px' }}>
+                <input style={{ ...s.input }} placeholder="New habit name..." value={newHabit} onChange={e => setNewHabit(e.target.value)} onKeyPress={e => e.key === 'Enter' && addHabit()} />
+                <button onClick={addHabit} style={s.btn}>Add</button>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {habits.length === 0 && <div style={{ ...s.card, textAlign: 'center', color: 'rgba(255,255,255,0.4)' }}>No habits yet! Add your first habit above.</div>}
+              {habits.map(habit => {
+                const today = new Date().toISOString().split('T')[0];
+                const doneToday = habit.history?.includes(today);
+                const last7 = getLast7Days();
+                return (
+                  <div key={habit.id} style={s.card}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '1.8rem' }}>{habit.emoji}</span>
+                      <div style={{ flex: 1 }}>
+                        <p style={{ margin: '0 0 6px', fontWeight: '600' }}>{habit.name}</p>
+                        <div style={{ display: 'flex', gap: '4px' }}>
+                          {last7.map(day => (
+                            <div key={day} style={{ width: '24px', height: '24px', borderRadius: '6px', background: habit.history?.includes(day) ? '#6366f1' : 'rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', color: 'rgba(255,255,255,0.4)' }}>
+                              {new Date(day).getDate()}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ color: '#f59e0b', fontWeight: '700' }}>🔥 {habit.streak || 0}</span>
+                        <button onClick={() => toggleHabitToday(habit.id)} style={{ ...s.btn, background: doneToday ? '#10b981' : 'linear-gradient(135deg, #6366f1, #8b5cf6)', padding: '8px 14px' }}>
+                          {doneToday ? '✓ Done' : 'Mark Done'}
+                        </button>
+                        <button onClick={() => deleteHabit(habit.id)} style={{ background: 'rgba(239,68,68,0.15)', border: 'none', borderRadius: '8px', color: '#ef4444', padding: '8px 10px', cursor: 'pointer' }}>🗑️</button>
                       </div>
                     </div>
-                    <StatusIcon className={`w-5 h-5 ${statusConfig[task.status].color}`} />
                   </div>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {task.description && (
-                    <p className="text-sm text-gray-600">{task.description}</p>
-                  )}
-                  {task.due_date && (
-                    <p className="text-xs text-gray-500">Due: {new Date(task.due_date).toLocaleDateString()}</p>
-                  )}
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleToggleStatus(task)}
-                      data-testid={`toggle-status-${task.id}`}
-                      className="flex-1"
-                    >
-                      {task.status === 'completed' ? 'Mark Incomplete' : 'Complete'}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => openEditDialog(task)}
-                      data-testid={`edit-task-${task.id}`}
-                    >
-                      <Edit className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleDeleteTask(task.id)}
-                      data-testid={`delete-task-${task.id}`}
-                      className="text-red-600 hover:bg-red-50"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-
-        {filteredTasks.length === 0 && (
-          <Card className="p-12 text-center">
-            <p className="text-gray-500">No tasks found. Create your first task to get started!</p>
-          </Card>
+                );
+              })}
+            </div>
+          </div>
         )}
-      </main>
 
-      {/* Edit Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent data-testid="edit-task-dialog">
-          <DialogHeader>
-            <DialogTitle>Edit Task</DialogTitle>
-            <DialogDescription>Update task details</DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleEditTask} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit-title">Title</Label>
-              <Input
-                id="edit-title"
-                data-testid="edit-task-title"
-                value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-description">Description</Label>
-              <Textarea
-                id="edit-description"
-                data-testid="edit-task-description"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Category</Label>
-                <Select value={formData.category} onValueChange={(val) => setFormData({ ...formData, category: val })}>
-                  <SelectTrigger data-testid="edit-task-category">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map(cat => (
-                      <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+        {/* ANALYTICS TAB */}
+        {activeTab === 'analytics' && (
+          <div>
+            <h2 style={{ marginBottom: '16px', fontSize: '1.2rem' }}>Analytics</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
+              <div style={s.card}>
+                <h3 style={{ margin: '0 0 16px', fontSize: '1rem', color: 'rgba(255,255,255,0.7)' }}>Task Completion</h3>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '12px' }}>
+                  <div style={{ position: 'relative', width: '120px', height: '120px' }}>
+                    <svg viewBox="0 0 120 120" style={{ transform: 'rotate(-90deg)' }}>
+                      <circle cx="60" cy="60" r="50" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="12" />
+                      <circle cx="60" cy="60" r="50" fill="none" stroke="#6366f1" strokeWidth="12"
+                        strokeDasharray={`${totalTasks > 0 ? (completedTasks / totalTasks) * 314 : 0} 314`} strokeLinecap="round" />
+                    </svg>
+                    <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', textAlign: 'center' }}>
+                      <div style={{ fontSize: '1.4rem', fontWeight: '800' }}>{totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0}%</div>
+                    </div>
+                  </div>
+                  <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.875rem', margin: 0 }}>{completedTasks} of {totalTasks} tasks done</p>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label>Priority</Label>
-                <Select value={formData.priority} onValueChange={(val) => setFormData({ ...formData, priority: val })}>
-                  <SelectTrigger data-testid="edit-task-priority">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Low">Low</SelectItem>
-                    <SelectItem value="Medium">Medium</SelectItem>
-                    <SelectItem value="High">High</SelectItem>
-                  </SelectContent>
-                </Select>
+
+              <div style={s.card}>
+                <h3 style={{ margin: '0 0 16px', fontSize: '1rem', color: 'rgba(255,255,255,0.7)' }}>Habit Streaks</h3>
+                {habits.length === 0 && <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.875rem' }}>No habits tracked yet</p>}
+                {habits.map(h => (
+                  <div key={h.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+                    <span>{h.emoji}</span>
+                    <span style={{ flex: 1, fontSize: '0.875rem' }}>{h.name}</span>
+                    <span style={{ color: '#f59e0b', fontWeight: '700' }}>🔥 {h.streak || 0}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div style={s.card}>
+                <h3 style={{ margin: '0 0 16px', fontSize: '1rem', color: 'rgba(255,255,255,0.7)' }}>Tasks by Priority</h3>
+                {['high', 'medium', 'low'].map(p => {
+                  const count = tasks.filter(t => t.priority === p).length;
+                  return (
+                    <div key={p} style={{ marginBottom: '10px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                        <span style={{ fontSize: '0.875rem', textTransform: 'capitalize', color: priorityColor[p] }}>{p}</span>
+                        <span style={{ fontSize: '0.875rem' }}>{count}</span>
+                      </div>
+                      <div style={{ height: '6px', background: 'rgba(255,255,255,0.08)', borderRadius: '3px' }}>
+                        <div style={{ height: '100%', width: `${totalTasks > 0 ? (count / totalTasks) * 100 : 0}%`, background: priorityColor[p], borderRadius: '3px', transition: 'width 0.3s' }} />
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
-            <div className="space-y-2">
-              <Label>Status</Label>
-              <Select value={formData.status} onValueChange={(val) => setFormData({ ...formData, status: val })}>
-                <SelectTrigger data-testid="edit-task-status">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todo">To Do</SelectItem>
-                  <SelectItem value="in-progress">In Progress</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-due_date">Due Date</Label>
-              <Input
-                id="edit-due_date"
-                type="date"
-                data-testid="edit-task-duedate"
-                value={formData.due_date}
-                onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
-              />
-            </div>
-            <DialogFooter>
-              <Button type="submit" data-testid="update-task-button" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>Update Task</Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
