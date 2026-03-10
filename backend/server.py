@@ -517,19 +517,3 @@ logger = logging.getLogger(__name__)
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
-```
-
-Also update `backend/requirements.txt` on GitHub — select all and paste:
-```
-fastapi==0.110.1
-uvicorn[standard]==0.25.0
-pymongo==4.5.0
-motor==3.3.1
-python-dotenv==1.2.1
-passlib[bcrypt]==1.7.4
-PyJWT==2.10.1
-email-validator==2.3.0
-python-multipart==0.0.21
-pydantic==2.12.5
-bcrypt==4.1.3
-google-auth==2.29.0
