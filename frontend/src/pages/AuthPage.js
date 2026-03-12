@@ -4,76 +4,94 @@ import axios from 'axios';
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID;
 
-const CHARACTERS = [
-  { name: "Monkey D. Luffy", img: "https://customer-assets.emergentagent.com/job_todomaster-271/artifacts/hpnw0se1_WhatsApp%20Image%202026-01-08%20at%2011.01.45%20AM%20%281%29.jpeg", color: "#f97316" },
-  { name: "Roronoa Zoro", img: "https://customer-assets.emergentagent.com/job_todomaster-271/artifacts/c17vjizp_WhatsApp%20Image%202026-01-08%20at%2011.01.46%20AM%20%281%29.jpeg", color: "#10b981" },
-  { name: "Levi Ackerman", img: "https://customer-assets.emergentagent.com/job_todomaster-271/artifacts/1l70xx0e_WhatsApp%20Image%202026-01-08%20at%2011.01.49%20AM.jpeg", color: "#6366f1" },
-  { name: "Eren Yeager", img: "https://customer-assets.emergentagent.com/job_todomaster-271/artifacts/1l70xx0e_WhatsApp%20Image%202026-01-08%20at%2011.01.49%20AM.jpeg", color: "#ef4444" },
-  { name: "Cristiano Ronaldo", img: "https://customer-assets.emergentagent.com/job_todomaster-271/artifacts/5a29zefk_WhatsApp%20Image%202026-01-08%20at%2011.01.30%20AM.jpeg", color: "#3b82f6" },
-  { name: "Billy Butcher", img: "https://customer-assets.emergentagent.com/job_todomaster-271/artifacts/c6n1apo2_WhatsApp%20Image%202026-01-08%20at%2011.01.39%20AM%20%281%29.jpeg", color: "#8b5cf6" },
-];
-
 function AnimatedBackground() {
   const canvasRef = useRef(null);
   useEffect(() => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     let animationId;
-    let particles = [];
-    const resize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
-    resize();
-    window.addEventListener('resize', resize);
-    class Particle {
-      constructor() { this.reset(); }
-      reset() {
-        this.x = Math.random() * canvas.width;
-        this.y = Math.random() * canvas.height;
-        this.size = Math.random() * 3 + 1;
-        this.speedX = (Math.random() - 0.5) * 0.8;
-        this.speedY = (Math.random() - 0.5) * 0.8;
-        this.opacity = Math.random() * 0.6 + 0.1;
-        this.color = ['#6366f1','#8b5cf6','#06b6d4','#f97316','#10b981'][Math.floor(Math.random()*5)];
-      }
-      update() {
-        this.x += this.speedX; this.y += this.speedY;
-        if (this.x < 0 || this.x > canvas.width || this.y < 0 || this.y > canvas.height) this.reset();
-      }
-      draw() {
-        ctx.save(); ctx.globalAlpha = this.opacity;
-        ctx.shadowBlur = 15; ctx.shadowColor = this.color;
-        ctx.fillStyle = this.color;
-        ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-        ctx.fill(); ctx.restore();
-      }
-    }
-    for (let i = 0; i < 120; i++) particles.push(new Particle());
-    let t = 0;
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; });
+
+    const stars = Array.from({ length: 180 }, () => ({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      r: Math.random() * 1.8 + 0.2,
+      opacity: Math.random() * 0.8 + 0.2,
+      twinkle: Math.random() * Math.PI * 2,
+      speed: Math.random() * 0.008 + 0.002,
+      color: ['#ffffff', '#c4b5fd', '#93c5fd', '#6ee7b7', '#fde68a'][Math.floor(Math.random() * 5)]
+    }));
+
+    const shootingStars = [];
+    const addShootingStar = () => {
+      shootingStars.push({ x: Math.random() * canvas.width * 0.7, y: Math.random() * canvas.height * 0.4, len: Math.random() * 120 + 60, speed: Math.random() * 4 + 3, opacity: 1, angle: Math.PI / 4 });
+    };
+    const shootInterval = setInterval(addShootingStar, 4000);
+
+    const cols = Math.floor(canvas.width / 26);
+    const drops = Array.from({ length: cols }, () => Math.random() * -80);
+    const chars = 'アイウエオカキクケコ0123456789ABCDEF∑∞∫√'.split('');
+    const matrixColors = ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981'];
+
+    let frame = 0;
     const animate = () => {
-      t += 0.003;
-      const r1 = Math.floor(15 + Math.sin(t) * 5);
-      const r2 = Math.floor(48 + Math.sin(t + 1) * 10);
-      const r3 = Math.floor(36 + Math.sin(t + 2) * 8);
-      ctx.fillStyle = `rgb(${r1},${r2},${r3})`;
+      frame++;
+      ctx.fillStyle = 'rgba(10, 8, 30, 0.25)';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-      // Draw connecting lines
-      for (let i = 0; i < particles.length; i++) {
-        for (let j = i + 1; j < particles.length; j++) {
-          const dx = particles[i].x - particles[j].x;
-          const dy = particles[i].y - particles[j].y;
-          const dist = Math.sqrt(dx*dx + dy*dy);
-          if (dist < 100) {
-            ctx.save(); ctx.globalAlpha = (1 - dist/100) * 0.15;
-            ctx.strokeStyle = '#8b5cf6'; ctx.lineWidth = 1;
-            ctx.beginPath(); ctx.moveTo(particles[i].x, particles[i].y);
-            ctx.lineTo(particles[j].x, particles[j].y); ctx.stroke(); ctx.restore();
-          }
+
+      // Stars
+      stars.forEach(s => {
+        s.twinkle += s.speed;
+        const op = s.opacity * (0.6 + 0.4 * Math.sin(s.twinkle));
+        ctx.save(); ctx.globalAlpha = op;
+        ctx.shadowBlur = 6; ctx.shadowColor = s.color;
+        ctx.fillStyle = s.color;
+        ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+        ctx.fill(); ctx.restore();
+      });
+
+      // Shooting stars
+      for (let i = shootingStars.length - 1; i >= 0; i--) {
+        const ss = shootingStars[i];
+        ctx.save(); ctx.globalAlpha = ss.opacity;
+        ctx.strokeStyle = '#c4b5fd'; ctx.lineWidth = 2;
+        ctx.shadowBlur = 10; ctx.shadowColor = '#8b5cf6';
+        ctx.beginPath(); ctx.moveTo(ss.x, ss.y);
+        ctx.lineTo(ss.x - Math.cos(ss.angle) * ss.len, ss.y - Math.sin(ss.angle) * ss.len);
+        ctx.stroke(); ctx.restore();
+        ss.x += ss.speed * Math.cos(ss.angle);
+        ss.y += ss.speed * Math.sin(ss.angle);
+        ss.opacity -= 0.012;
+        if (ss.opacity <= 0) shootingStars.splice(i, 1);
+      }
+
+      // Matrix rain — every 6 frames for slowness
+      if (frame % 6 === 0) {
+        ctx.font = '14px monospace';
+        for (let i = 0; i < drops.length; i++) {
+          const char = chars[Math.floor(Math.random() * chars.length)];
+          const color = matrixColors[Math.floor(Math.random() * matrixColors.length)];
+          ctx.save(); ctx.globalAlpha = 0.25;
+          ctx.shadowBlur = 8; ctx.shadowColor = color;
+          ctx.fillStyle = color;
+          ctx.fillText(char, i * 26, drops[i] * 26);
+          ctx.restore();
+          ctx.save(); ctx.globalAlpha = 0.7;
+          ctx.fillStyle = '#e0e7ff';
+          ctx.shadowBlur = 10; ctx.shadowColor = '#fff';
+          ctx.fillText(char, i * 26, drops[i] * 26);
+          ctx.restore();
+          if (drops[i] * 26 > canvas.height && Math.random() > 0.985) drops[i] = 0;
+          drops[i] += 0.3;
         }
       }
-      particles.forEach(p => { p.update(); p.draw(); });
+
       animationId = requestAnimationFrame(animate);
     };
     animate();
-    return () => { window.removeEventListener('resize', resize); cancelAnimationFrame(animationId); };
+    return () => { clearInterval(shootInterval); cancelAnimationFrame(animationId); };
   }, []);
   return <canvas ref={canvasRef} style={{ position: 'fixed', inset: 0, zIndex: 0 }} />;
 }
@@ -87,18 +105,9 @@ export default function AuthPage() {
   const [success, setSuccess] = useState('');
   const [profilePhoto, setProfilePhoto] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
-  const [currentChar, setCurrentChar] = useState(0);
-  const [charVisible, setCharVisible] = useState(true);
   const [mounted, setMounted] = useState(false);
 
-  useEffect(() => {
-    setTimeout(() => setMounted(true), 100);
-    const interval = setInterval(() => {
-      setCharVisible(false);
-      setTimeout(() => { setCurrentChar(p => (p + 1) % CHARACTERS.length); setCharVisible(true); }, 500);
-    }, 3000);
-    return () => clearInterval(interval);
-  }, []);
+  useEffect(() => { setTimeout(() => setMounted(true), 100); }, []);
 
   useEffect(() => {
     const initGoogle = () => {
@@ -117,7 +126,7 @@ export default function AuthPage() {
       localStorage.setItem('token', res.data.token);
       localStorage.setItem('user', JSON.stringify(res.data.user));
       window.location.href = '/';
-    } catch { setError('Google login failed.'); }
+    } catch { setError('Google login failed. Try email login.'); }
     finally { setLoading(false); }
   };
 
@@ -147,80 +156,32 @@ export default function AuthPage() {
     finally { setLoading(false); }
   };
 
-  const char = CHARACTERS[currentChar];
-
   const inputStyle = {
     width: '100%', padding: '13px 14px',
     background: 'rgba(255,255,255,0.07)',
     border: '1px solid rgba(255,255,255,0.15)',
     borderRadius: '12px', color: '#fff',
     fontSize: '0.95rem', outline: 'none',
-    boxSizing: 'border-box', transition: 'all 0.3s',
+    boxSizing: 'border-box', transition: 'border 0.3s',
     fontFamily: "'Outfit', sans-serif"
+  };
+
+  const labelStyle = {
+    color: 'rgba(255,255,255,0.55)', fontSize: '0.78rem',
+    display: 'block', marginBottom: '7px',
+    fontWeight: '600', letterSpacing: '0.6px', textTransform: 'uppercase'
   };
 
   return (
     <div style={{ minHeight: '100vh', fontFamily: "'Outfit', sans-serif", position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
       <AnimatedBackground />
 
-      {/* Character showcase - left side */}
-      <div style={{
-        position: 'fixed', left: '5%', top: '50%', transform: 'translateY(-50%)',
-        display: window.innerWidth > 1100 ? 'flex' : 'none',
-        flexDirection: 'column', alignItems: 'center', gap: '16px', zIndex: 1
-      }}>
-        <div style={{
-          width: '220px', height: '280px', borderRadius: '20px', overflow: 'hidden',
-          border: `2px solid ${char.color}`,
-          boxShadow: `0 0 40px ${char.color}60`,
-          transition: 'all 0.5s ease',
-          opacity: charVisible ? 1 : 0,
-          transform: charVisible ? 'scale(1) translateY(0)' : 'scale(0.95) translateY(10px)',
-        }}>
-          <img src={char.img} alt={char.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-        </div>
-        <div style={{
-          color: '#fff', fontWeight: '700', fontSize: '1rem', textAlign: 'center',
-          opacity: charVisible ? 1 : 0, transition: 'opacity 0.5s',
-          textShadow: `0 0 20px ${char.color}`
-        }}>{char.name}</div>
-        {/* Character dots */}
-        <div style={{ display: 'flex', gap: '8px' }}>
-          {CHARACTERS.map((_, i) => (
-            <div key={i} onClick={() => { setCurrentChar(i); setCharVisible(true); }}
-              style={{ width: i === currentChar ? '20px' : '8px', height: '8px', borderRadius: '4px', cursor: 'pointer', transition: 'all 0.3s', background: i === currentChar ? char.color : 'rgba(255,255,255,0.3)' }} />
-          ))}
-        </div>
-      </div>
-
-      {/* Right character */}
-      <div style={{
-        position: 'fixed', right: '5%', top: '50%', transform: 'translateY(-50%)',
-        display: window.innerWidth > 1100 ? 'flex' : 'none',
-        flexDirection: 'column', alignItems: 'center', gap: '16px', zIndex: 1
-      }}>
-        <div style={{
-          width: '220px', height: '280px', borderRadius: '20px', overflow: 'hidden',
-          border: `2px solid ${CHARACTERS[(currentChar + 3) % CHARACTERS.length].color}`,
-          boxShadow: `0 0 40px ${CHARACTERS[(currentChar + 3) % CHARACTERS.length].color}60`,
-          opacity: charVisible ? 1 : 0,
-          transition: 'all 0.5s ease',
-          transform: charVisible ? 'scale(1) translateY(0)' : 'scale(0.95) translateY(10px)',
-        }}>
-          <img src={CHARACTERS[(currentChar + 3) % CHARACTERS.length].img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-        </div>
-        <div style={{ color: '#fff', fontWeight: '700', fontSize: '1rem', textAlign: 'center', opacity: charVisible ? 1 : 0, transition: 'opacity 0.5s', textShadow: `0 0 20px ${CHARACTERS[(currentChar + 3) % CHARACTERS.length].color}` }}>
-          {CHARACTERS[(currentChar + 3) % CHARACTERS.length].name}
-        </div>
-      </div>
-
-      {/* Main card */}
       <div style={{
         position: 'relative', zIndex: 2,
-        background: 'rgba(15,12,41,0.85)', backdropFilter: 'blur(30px)',
+        background: 'rgba(10,8,30,0.82)', backdropFilter: 'blur(30px)',
         borderRadius: '28px', padding: '44px 40px', width: '100%', maxWidth: '460px',
-        border: '1px solid rgba(255,255,255,0.12)',
-        boxShadow: '0 30px 80px rgba(0,0,0,0.6), 0 0 60px rgba(99,102,241,0.15)',
+        border: '1px solid rgba(255,255,255,0.1)',
+        boxShadow: '0 30px 80px rgba(0,0,0,0.7), 0 0 60px rgba(99,102,241,0.12)',
         opacity: mounted ? 1 : 0,
         transform: mounted ? 'translateY(0)' : 'translateY(30px)',
         transition: 'all 0.6s ease'
@@ -228,31 +189,31 @@ export default function AuthPage() {
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: '28px' }}>
           <div style={{ fontSize: '2.8rem', marginBottom: '4px' }}>⚡</div>
-          <h1 style={{ fontSize: '2rem', fontWeight: '800', color: '#fff', margin: '0 0 6px 0', letterSpacing: '-0.5px' }}>
-            Task<span style={{ color: '#6366f1' }}>Master</span>
+          <h1 style={{ fontSize: '2.2rem', fontWeight: '800', color: '#fff', margin: '0 0 6px 0', letterSpacing: '-0.5px' }}>
+            Task<span style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Master</span>
           </h1>
-          <p style={{ color: 'rgba(255,255,255,0.45)', margin: 0, fontSize: '0.9rem' }}>Build habits. Dominate your day.</p>
+          <p style={{ color: 'rgba(255,255,255,0.4)', margin: 0, fontSize: '0.88rem' }}>Build habits. Dominate your day.</p>
         </div>
 
         {/* Tab switcher */}
         {!isForgot && (
-          <div style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', borderRadius: '12px', padding: '4px', marginBottom: '28px' }}>
+          <div style={{ display: 'flex', background: 'rgba(255,255,255,0.04)', borderRadius: '14px', padding: '4px', marginBottom: '28px', border: '1px solid rgba(255,255,255,0.07)' }}>
             {['Login', 'Sign Up'].map((tab, i) => (
               <button key={tab} onClick={() => { setIsLogin(i === 0); setError(''); setSuccess(''); }}
                 style={{
-                  flex: 1, padding: '10px', border: 'none', borderRadius: '10px', cursor: 'pointer',
-                  fontFamily: "'Outfit', sans-serif", fontWeight: '600', fontSize: '0.95rem', transition: 'all 0.3s',
+                  flex: 1, padding: '11px', border: 'none', borderRadius: '11px', cursor: 'pointer',
+                  fontFamily: "'Outfit', sans-serif", fontWeight: '700', fontSize: '0.95rem', transition: 'all 0.3s',
                   background: (i === 0) === isLogin ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : 'transparent',
-                  color: (i === 0) === isLogin ? '#fff' : 'rgba(255,255,255,0.4)',
-                  boxShadow: (i === 0) === isLogin ? '0 4px 15px rgba(99,102,241,0.4)' : 'none'
+                  color: (i === 0) === isLogin ? '#fff' : 'rgba(255,255,255,0.35)',
+                  boxShadow: (i === 0) === isLogin ? '0 4px 15px rgba(99,102,241,0.5)' : 'none'
                 }}>{tab}</button>
             ))}
           </div>
         )}
 
         {isForgot && (
-          <div style={{ marginBottom: '20px' }}>
-            <button onClick={() => setIsForgot(false)} style={{ background: 'none', border: 'none', color: '#818cf8', cursor: 'pointer', fontSize: '0.9rem', padding: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div style={{ marginBottom: '24px' }}>
+            <button onClick={() => setIsForgot(false)} style={{ background: 'none', border: 'none', color: '#818cf8', cursor: 'pointer', fontSize: '0.9rem', padding: 0, display: 'flex', alignItems: 'center', gap: '6px', fontFamily: "'Outfit', sans-serif" }}>
               ← Back to login
             </button>
             <h2 style={{ color: '#fff', fontSize: '1.4rem', fontWeight: '700', margin: '12px 0 4px' }}>Reset Password</h2>
@@ -260,33 +221,33 @@ export default function AuthPage() {
           </div>
         )}
 
-        {/* Profile photo */}
+        {/* Profile photo (signup only) */}
         {!isLogin && !isForgot && (
           <div style={{ textAlign: 'center', marginBottom: '20px' }}>
             <label style={{ cursor: 'pointer', display: 'inline-block' }}>
               <div style={{
                 width: '88px', height: '88px', borderRadius: '50%',
-                background: 'rgba(99,102,241,0.15)',
-                border: profilePhoto ? `3px solid #6366f1` : '2px dashed rgba(99,102,241,0.5)',
+                background: 'rgba(99,102,241,0.12)',
+                border: profilePhoto ? '3px solid #6366f1' : '2px dashed rgba(99,102,241,0.5)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 margin: '0 auto 8px', overflow: 'hidden', transition: 'all 0.3s',
                 boxShadow: profilePhoto ? '0 0 20px rgba(99,102,241,0.4)' : 'none'
               }}>
                 {profilePhoto ? <img src={profilePhoto} alt="profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: '2rem' }}>📷</span>}
               </div>
-              <span style={{ color: 'rgba(99,102,241,0.8)', fontSize: '0.78rem' }}>Add profile photo</span>
+              <span style={{ color: 'rgba(99,102,241,0.7)', fontSize: '0.78rem' }}>Add profile photo</span>
               <input type="file" accept="image/*" onChange={handlePhotoChange} style={{ display: 'none' }} />
             </label>
           </div>
         )}
 
         {error && (
-          <div style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '12px', padding: '12px 14px', marginBottom: '16px', color: '#fca5a5', fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '12px', padding: '12px 14px', marginBottom: '16px', color: '#fca5a5', fontSize: '0.875rem' }}>
             ⚠️ {error}
           </div>
         )}
         {success && (
-          <div style={{ background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: '12px', padding: '12px 14px', marginBottom: '16px', color: '#6ee7b7', fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: '12px', padding: '12px 14px', marginBottom: '16px', color: '#6ee7b7', fontSize: '0.875rem' }}>
             ✅ {success}
           </div>
         )}
@@ -294,23 +255,23 @@ export default function AuthPage() {
         <form onSubmit={handleSubmit}>
           {!isLogin && !isForgot && (
             <div style={{ marginBottom: '16px' }}>
-              <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.82rem', display: 'block', marginBottom: '7px', fontWeight: '600', letterSpacing: '0.5px', textTransform: 'uppercase' }}>Full Name</label>
+              <label style={labelStyle}>Full Name</label>
               <input name="name" type="text" placeholder="Rithvik" value={formData.name} onChange={handleChange} required style={inputStyle} />
             </div>
           )}
 
           <div style={{ marginBottom: '16px' }}>
-            <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.82rem', display: 'block', marginBottom: '7px', fontWeight: '600', letterSpacing: '0.5px', textTransform: 'uppercase' }}>Email</label>
+            <label style={labelStyle}>Email</label>
             <input name="email" type="email" placeholder="you@example.com" value={formData.email} onChange={handleChange} required style={inputStyle} />
           </div>
 
           {!isForgot && (
             <div style={{ marginBottom: '8px' }}>
-              <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.82rem', display: 'block', marginBottom: '7px', fontWeight: '600', letterSpacing: '0.5px', textTransform: 'uppercase' }}>Password</label>
+              <label style={labelStyle}>Password</label>
               <div style={{ position: 'relative' }}>
                 <input name="password" type={showPassword ? 'text' : 'password'} placeholder="••••••••" value={formData.password} onChange={handleChange} required style={{ ...inputStyle, paddingRight: '48px' }} />
                 <button type="button" onClick={() => setShowPassword(!showPassword)}
-                  style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.1rem', color: 'rgba(255,255,255,0.5)', padding: 0 }}>
+                  style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.1rem', color: 'rgba(255,255,255,0.4)', padding: 0 }}>
                   {showPassword ? '🙈' : '👁️'}
                 </button>
               </div>
@@ -318,23 +279,23 @@ export default function AuthPage() {
           )}
 
           {isLogin && !isForgot && (
-            <div style={{ textAlign: 'right', marginBottom: '20px' }}>
-              <span onClick={() => { setIsForgot(true); setError(''); setSuccess(''); }} style={{ color: '#818cf8', fontSize: '0.82rem', cursor: 'pointer', fontWeight: '600' }}>
+            <div style={{ textAlign: 'right', marginBottom: '22px' }}>
+              <span onClick={() => { setIsForgot(true); setError(''); setSuccess(''); }}
+                style={{ color: '#818cf8', fontSize: '0.82rem', cursor: 'pointer', fontWeight: '600' }}>
                 Forgot password?
               </span>
             </div>
           )}
 
-          {!isLogin && <div style={{ marginBottom: '20px' }} />}
+          {!isLogin && <div style={{ marginBottom: '22px' }} />}
 
           <button type="submit" disabled={loading} style={{
             width: '100%', padding: '14px',
-            background: loading ? 'rgba(99,102,241,0.4)' : 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+            background: loading ? 'rgba(99,102,241,0.35)' : 'linear-gradient(135deg, #6366f1, #8b5cf6)',
             border: 'none', borderRadius: '12px', color: '#fff', fontSize: '1rem',
             fontWeight: '700', cursor: loading ? 'not-allowed' : 'pointer', marginBottom: '16px',
-            boxShadow: loading ? 'none' : '0 8px 25px rgba(99,102,241,0.45)',
-            transition: 'all 0.3s', fontFamily: "'Outfit', sans-serif",
-            letterSpacing: '0.3px'
+            boxShadow: loading ? 'none' : '0 8px 25px rgba(99,102,241,0.4)',
+            transition: 'all 0.3s', fontFamily: "'Outfit', sans-serif"
           }}>
             {loading ? '⏳ Please wait...' : isForgot ? '📧 Send Reset Link' : isLogin ? '🚀 Login' : '✨ Create Account'}
           </button>
@@ -343,16 +304,16 @@ export default function AuthPage() {
         {!isForgot && (
           <>
             <div style={{ margin: '4px 0 16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.08)' }} />
+              <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.07)' }} />
               <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.78rem' }}>or continue with</span>
-              <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.08)' }} />
+              <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.07)' }} />
             </div>
             <div id="google-btn" style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }} />
           </>
         )}
 
         {!isForgot && (
-          <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.35)', fontSize: '0.85rem', margin: 0 }}>
+          <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: '0.85rem', margin: 0 }}>
             {isLogin ? "Don't have an account? " : 'Already have an account? '}
             <span onClick={() => { setIsLogin(!isLogin); setError(''); setSuccess(''); }}
               style={{ color: '#818cf8', cursor: 'pointer', fontWeight: '700' }}>
