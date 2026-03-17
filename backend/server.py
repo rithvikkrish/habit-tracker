@@ -110,6 +110,10 @@ class HabitModel(BaseModel):
 class HabitToggle(BaseModel):
     date: str
 
+class HabitEdit(BaseModel):
+    name: str
+    emoji: str
+
 # ── Auth Helpers ──
 def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
@@ -132,7 +136,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     except:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
-# ── Quotes ──
+# ── Quotes Data ──
 CHARACTER_QUOTES = {
     "Billy Butcher": [
         "Oi! You got a job to do, so do it.",
@@ -335,15 +339,15 @@ CHARACTER_QUOTES = {
 }
 
 CHARACTER_IMAGES = {
-    "Billy Butcher": "https://customer-assets.emergentagent.com/job_todomaster-271/artifacts/c6n1apo2_WhatsApp%20Image%202026-01-08%20at%2011.01.39%20AM%20%281%29.jpeg",
-    "Tyler Durden": "https://customer-assets.emergentagent.com/job_todomaster-271/artifacts/xt837vep_WhatsApp%20Image%202026-01-08%20at%2011.01.41%20AM%20%281%29.jpeg",
-    "Monkey D. Luffy": "https://customer-assets.emergentagent.com/job_todomaster-271/artifacts/hpnw0se1_WhatsApp%20Image%202026-01-08%20at%2011.01.45%20AM%20%281%29.jpeg",
-    "Roronoa Zoro": "https://customer-assets.emergentagent.com/job_todomaster-271/artifacts/c17vjizp_WhatsApp%20Image%202026-01-08%20at%2011.01.46%20AM%20%281%29.jpeg",
-    "Cristiano Ronaldo": "https://customer-assets.emergentagent.com/job_todomaster-271/artifacts/5a29zefk_WhatsApp%20Image%202026-01-08%20at%2011.01.30%20AM.jpeg",
-    "Eren Yeager": "https://customer-assets.emergentagent.com/job_todomaster-271/artifacts/1l70xx0e_WhatsApp%20Image%202026-01-08%20at%2011.01.49%20AM.jpeg",
-    "John Wick": "https://customer-assets.emergentagent.com/job_todomaster-271/artifacts/xt837vep_WhatsApp%20Image%202026-01-08%20at%2011.01.41%20AM%20%281%29.jpeg",
-    "Homelander": "https://customer-assets.emergentagent.com/job_todomaster-271/artifacts/gitrwtu1_WhatsApp%20Image%202026-01-08%20at%2011.01.37%20AM.jpeg",
-    "Levi Ackerman": "https://customer-assets.emergentagent.com/job_todomaster-271/artifacts/1l70xx0e_WhatsApp%20Image%202026-01-08%20at%2011.01.49%20AM.jpeg"
+    "Billy Butcher":    "https://customer-assets.emergentagent.com/job_todomaster-271/artifacts/c6n1apo2_WhatsApp%20Image%202026-01-08%20at%2011.01.39%20AM%20%281%29.jpeg",
+    "Tyler Durden":     "https://customer-assets.emergentagent.com/job_todomaster-271/artifacts/xt837vep_WhatsApp%20Image%202026-01-08%20at%2011.01.41%20AM%20%281%29.jpeg",
+    "Monkey D. Luffy":  "https://customer-assets.emergentagent.com/job_todomaster-271/artifacts/hpnw0se1_WhatsApp%20Image%202026-01-08%20at%2011.01.45%20AM%20%281%29.jpeg",
+    "Roronoa Zoro":     "https://customer-assets.emergentagent.com/job_todomaster-271/artifacts/c17vjizp_WhatsApp%20Image%202026-01-08%20at%2011.01.46%20AM%20%281%29.jpeg",
+    "Cristiano Ronaldo":"https://customer-assets.emergentagent.com/job_todomaster-271/artifacts/5a29zefk_WhatsApp%20Image%202026-01-08%20at%2011.01.30%20AM.jpeg",
+    "Eren Yeager":      "https://customer-assets.emergentagent.com/job_todomaster-271/artifacts/1l70xx0e_WhatsApp%20Image%202026-01-08%20at%2011.01.49%20AM.jpeg",
+    "John Wick":        "https://customer-assets.emergentagent.com/job_todomaster-271/artifacts/xt837vep_WhatsApp%20Image%202026-01-08%20at%2011.01.41%20AM%20%281%29.jpeg",
+    "Homelander":       "https://customer-assets.emergentagent.com/job_todomaster-271/artifacts/gitrwtu1_WhatsApp%20Image%202026-01-08%20at%2011.01.37%20AM.jpeg",
+    "Levi Ackerman":    "https://customer-assets.emergentagent.com/job_todomaster-271/artifacts/1l70xx0e_WhatsApp%20Image%202026-01-08%20at%2011.01.49%20AM.jpeg"
 }
 
 # ── Auth Routes ──
@@ -361,11 +365,11 @@ async def register(user_data: UserCreate):
     doc['created_at'] = doc['created_at'].isoformat()
     await db.users.insert_one(doc)
     default_categories = [
-        {"name": "Work",     "color": "#8B5CF6"},
-        {"name": "Personal", "color": "#06B6D4"},
-        {"name": "Shopping", "color": "#F97316"},
-        {"name": "Health",   "color": "#10B981"},
-        {"name": "Learning", "color": "#F59E0B"}
+        {"name": "Work",     "color": "#00e5ff"},
+        {"name": "Personal", "color": "#bf5fff"},
+        {"name": "Shopping", "color": "#f59e0b"},
+        {"name": "Health",   "color": "#10b981"},
+        {"name": "Learning", "color": "#06b6d4"}
     ]
     for cat in default_categories:
         cat_obj = Category(user_id=user_obj.id, name=cat['name'], color=cat['color'], is_default=True)
@@ -402,12 +406,10 @@ async def get_me(user_id: str = Depends(get_current_user)):
 async def google_auth(request: GoogleAuthRequest):
     try:
         idinfo = id_token.verify_oauth2_token(
-            request.token,
-            google_requests.Request(),
-            GOOGLE_CLIENT_ID
+            request.token, google_requests.Request(), GOOGLE_CLIENT_ID
         )
         email = idinfo['email']
-        name = idinfo.get('name', email.split('@')[0])
+        name  = idinfo.get('name', email.split('@')[0])
         user_doc = await db.users.find_one({"email": email}, {"_id": 0})
         if not user_doc:
             user_obj = User(email=email, name=name)
@@ -415,15 +417,9 @@ async def google_auth(request: GoogleAuthRequest):
             doc['password_hash'] = ''
             doc['created_at'] = doc['created_at'].isoformat()
             await db.users.insert_one(doc)
-            default_categories = [
-                {"name": "Work",     "color": "#8B5CF6"},
-                {"name": "Personal", "color": "#06B6D4"},
-                {"name": "Health",   "color": "#10B981"},
-            ]
-            for cat in default_categories:
+            for cat in [{"name":"Work","color":"#00e5ff"},{"name":"Personal","color":"#bf5fff"},{"name":"Health","color":"#10b981"}]:
                 cat_obj = Category(user_id=user_obj.id, name=cat['name'], color=cat['color'], is_default=True)
-                cat_doc = cat_obj.model_dump()
-                cat_doc['created_at'] = cat_doc['created_at'].isoformat()
+                cat_doc = cat_obj.model_dump(); cat_doc['created_at'] = cat_doc['created_at'].isoformat()
                 await db.categories.insert_one(cat_doc)
         else:
             user_doc.pop('password_hash', None)
@@ -432,7 +428,7 @@ async def google_auth(request: GoogleAuthRequest):
             user_obj = User(**user_doc)
         token = create_token(user_obj.id)
         return TokenResponse(token=token, user=user_obj)
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=401, detail="Google authentication failed")
 
 # ── Task Routes ──
@@ -448,11 +444,9 @@ async def create_task(task_data: TaskCreate, user_id: str = Depends(get_current_
 @api_router.get("/tasks", response_model=List[Task])
 async def get_tasks(user_id: str = Depends(get_current_user)):
     tasks = await db.tasks.find({"user_id": user_id}, {"_id": 0}).to_list(1000)
-    for task in tasks:
-        if isinstance(task.get('created_at'), str):
-            task['created_at'] = datetime.fromisoformat(task['created_at'])
-        if isinstance(task.get('updated_at'), str):
-            task['updated_at'] = datetime.fromisoformat(task['updated_at'])
+    for t in tasks:
+        if isinstance(t.get('created_at'), str): t['created_at'] = datetime.fromisoformat(t['created_at'])
+        if isinstance(t.get('updated_at'), str): t['updated_at'] = datetime.fromisoformat(t['updated_at'])
     return tasks
 
 @api_router.put("/tasks/{task_id}", response_model=Task)
@@ -463,12 +457,10 @@ async def update_task(task_id: str, task_data: TaskUpdate, user_id: str = Depend
     update_dict = {k: v for k, v in task_data.model_dump().items() if v is not None}
     update_dict['updated_at'] = datetime.now(timezone.utc).isoformat()
     await db.tasks.update_one({"id": task_id}, {"$set": update_dict})
-    updated_doc = await db.tasks.find_one({"id": task_id}, {"_id": 0})
-    if isinstance(updated_doc.get('created_at'), str):
-        updated_doc['created_at'] = datetime.fromisoformat(updated_doc['created_at'])
-    if isinstance(updated_doc.get('updated_at'), str):
-        updated_doc['updated_at'] = datetime.fromisoformat(updated_doc['updated_at'])
-    return Task(**updated_doc)
+    updated = await db.tasks.find_one({"id": task_id}, {"_id": 0})
+    if isinstance(updated.get('created_at'), str): updated['created_at'] = datetime.fromisoformat(updated['created_at'])
+    if isinstance(updated.get('updated_at'), str): updated['updated_at'] = datetime.fromisoformat(updated['updated_at'])
+    return Task(**updated)
 
 @api_router.delete("/tasks/{task_id}")
 async def delete_task(task_id: str, user_id: str = Depends(get_current_user)):
@@ -480,27 +472,31 @@ async def delete_task(task_id: str, user_id: str = Depends(get_current_user)):
 # ── Category Routes ──
 @api_router.get("/categories", response_model=List[Category])
 async def get_categories(user_id: str = Depends(get_current_user)):
-    categories = await db.categories.find({"user_id": user_id}, {"_id": 0}).to_list(1000)
-    for cat in categories:
-        if isinstance(cat.get('created_at'), str):
-            cat['created_at'] = datetime.fromisoformat(cat['created_at'])
-    return categories
+    cats = await db.categories.find({"user_id": user_id}, {"_id": 0}).to_list(1000)
+    for c in cats:
+        if isinstance(c.get('created_at'), str): c['created_at'] = datetime.fromisoformat(c['created_at'])
+    return cats
 
 @api_router.post("/categories", response_model=Category)
 async def create_category(cat_data: CategoryCreate, user_id: str = Depends(get_current_user)):
     cat_obj = Category(user_id=user_id, **cat_data.model_dump())
-    doc = cat_obj.model_dump()
-    doc['created_at'] = doc['created_at'].isoformat()
+    doc = cat_obj.model_dump(); doc['created_at'] = doc['created_at'].isoformat()
     await db.categories.insert_one(doc)
     return cat_obj
 
-# ── Habit Routes ── (saved to MongoDB, persists across logins)
+@api_router.delete("/categories/{cat_id}")
+async def delete_category(cat_id: str, user_id: str = Depends(get_current_user)):
+    result = await db.categories.delete_one({"id": cat_id, "user_id": user_id, "is_default": False})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Category not found or is a default category")
+    return {"message": "Deleted"}
+
+# ── Habit Routes ──
 @api_router.get("/habits")
 async def get_habits(user_id: str = Depends(get_current_user)):
     habits = await db.habits.find({"user_id": user_id}).to_list(1000)
     for h in habits:
-        h["id"] = str(h["_id"])
-        del h["_id"]
+        h["id"] = str(h["_id"]); del h["_id"]
     return habits
 
 @api_router.post("/habits")
@@ -514,8 +510,7 @@ async def create_habit(habit: HabitModel, user_id: str = Depends(get_current_use
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     result = await db.habits.insert_one(doc)
-    doc["id"] = str(result.inserted_id)
-    del doc["_id"]
+    doc["id"] = str(result.inserted_id); del doc["_id"]
     return doc
 
 @api_router.put("/habits/{habit_id}/toggle")
@@ -528,23 +523,33 @@ async def toggle_habit(habit_id: str, toggle: HabitToggle, user_id: str = Depend
         history.remove(toggle.date)
     else:
         history.append(toggle.date)
-    # recalculate streak
     streak = 0
     today = date.today()
     for i in range(30):
         d = (today - timedelta(days=i)).isoformat()
-        if d in history:
-            streak += 1
-        else:
-            break
+        if d in history: streak += 1
+        else: break
     await db.habits.update_one(
         {"_id": ObjectId(habit_id)},
         {"$set": {"history": history, "streak": streak}}
     )
     habit["history"] = history
     habit["streak"] = streak
-    habit["id"] = str(habit["_id"])
-    del habit["_id"]
+    habit["id"] = str(habit["_id"]); del habit["_id"]
+    return habit
+
+@api_router.put("/habits/{habit_id}/edit")
+async def edit_habit(habit_id: str, data: HabitEdit, user_id: str = Depends(get_current_user)):
+    habit = await db.habits.find_one({"_id": ObjectId(habit_id), "user_id": user_id})
+    if not habit:
+        raise HTTPException(status_code=404, detail="Habit not found")
+    await db.habits.update_one(
+        {"_id": ObjectId(habit_id)},
+        {"$set": {"name": data.name, "emoji": data.emoji}}
+    )
+    habit["name"]  = data.name
+    habit["emoji"] = data.emoji
+    habit["id"]    = str(habit["_id"]); del habit["_id"]
     return habit
 
 @api_router.delete("/habits/{habit_id}")
@@ -559,20 +564,14 @@ async def delete_habit(habit_id: str, user_id: str = Depends(get_current_user)):
 async def get_daily_quote():
     hours_since_epoch = int(datetime.now(timezone.utc).timestamp() / 3600)
     characters = list(CHARACTER_QUOTES.keys())
-    character_index = hours_since_epoch % len(characters)
-    character = characters[character_index]
-    quotes = CHARACTER_QUOTES[character]
-    quote_index = (hours_since_epoch // len(characters)) % len(quotes)
-    quote = quotes[quote_index]
-    return DailyQuote(
-        character=character,
-        quote=quote,
-        image_url=CHARACTER_IMAGES[character]
-    )
+    character  = characters[hours_since_epoch % len(characters)]
+    quotes     = CHARACTER_QUOTES[character]
+    quote      = quotes[(hours_since_epoch // len(characters)) % len(quotes)]
+    return DailyQuote(character=character, quote=quote, image_url=CHARACTER_IMAGES[character])
 
 @api_router.get("/")
 async def root():
-    return {"message": "Task Manager API"}
+    return {"message": "TaskMaster API"}
 
 # ── App Setup ──
 app.add_middleware(
@@ -585,10 +584,7 @@ app.add_middleware(
 
 app.include_router(api_router)
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 @app.on_event("shutdown")
