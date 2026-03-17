@@ -11,9 +11,10 @@ from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
 from typing import List, Optional
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone, timedelta, date
 import bcrypt
 import jwt
+from bson import ObjectId
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -30,6 +31,7 @@ JWT_SECRET = os.environ.get('JWT_SECRET', 'your-secret-key-change-in-production'
 JWT_ALGORITHM = 'HS256'
 GOOGLE_CLIENT_ID = '1041754056180-rqofs6e3oumsjn5jqmv7norc2bdfj82o.apps.googleusercontent.com'
 
+# ── Models ──
 class UserCreate(BaseModel):
     email: EmailStr
     password: str
@@ -100,6 +102,15 @@ class DailyQuote(BaseModel):
     quote: str
     image_url: str
 
+# ── Habit Models ──
+class HabitModel(BaseModel):
+    name: str
+    emoji: str = "⭐"
+
+class HabitToggle(BaseModel):
+    date: str
+
+# ── Auth Helpers ──
 def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
@@ -121,6 +132,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     except:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
+# ── Quotes ──
 CHARACTER_QUOTES = {
     "Billy Butcher": [
         "Oi! You got a job to do, so do it.",
@@ -334,6 +346,7 @@ CHARACTER_IMAGES = {
     "Levi Ackerman": "https://customer-assets.emergentagent.com/job_todomaster-271/artifacts/1l70xx0e_WhatsApp%20Image%202026-01-08%20at%2011.01.49%20AM.jpeg"
 }
 
+# ── Auth Routes ──
 @api_router.post("/auth/register", response_model=TokenResponse)
 async def register(user_data: UserCreate):
     existing = await db.users.find_one({"email": user_data.email}, {"_id": 0})
@@ -348,10 +361,10 @@ async def register(user_data: UserCreate):
     doc['created_at'] = doc['created_at'].isoformat()
     await db.users.insert_one(doc)
     default_categories = [
-        {"name": "Work", "color": "#8B5CF6"},
+        {"name": "Work",     "color": "#8B5CF6"},
         {"name": "Personal", "color": "#06B6D4"},
         {"name": "Shopping", "color": "#F97316"},
-        {"name": "Health", "color": "#10B981"},
+        {"name": "Health",   "color": "#10B981"},
         {"name": "Learning", "color": "#F59E0B"}
     ]
     for cat in default_categories:
@@ -403,9 +416,9 @@ async def google_auth(request: GoogleAuthRequest):
             doc['created_at'] = doc['created_at'].isoformat()
             await db.users.insert_one(doc)
             default_categories = [
-                {"name": "Work", "color": "#8B5CF6"},
+                {"name": "Work",     "color": "#8B5CF6"},
                 {"name": "Personal", "color": "#06B6D4"},
-                {"name": "Health", "color": "#10B981"},
+                {"name": "Health",   "color": "#10B981"},
             ]
             for cat in default_categories:
                 cat_obj = Category(user_id=user_obj.id, name=cat['name'], color=cat['color'], is_default=True)
@@ -422,6 +435,7 @@ async def google_auth(request: GoogleAuthRequest):
     except Exception as e:
         raise HTTPException(status_code=401, detail="Google authentication failed")
 
+# ── Task Routes ──
 @api_router.post("/tasks", response_model=Task)
 async def create_task(task_data: TaskCreate, user_id: str = Depends(get_current_user)):
     task_obj = Task(user_id=user_id, **task_data.model_dump())
@@ -463,6 +477,7 @@ async def delete_task(task_id: str, user_id: str = Depends(get_current_user)):
         raise HTTPException(status_code=404, detail="Task not found")
     return {"message": "Task deleted"}
 
+# ── Category Routes ──
 @api_router.get("/categories", response_model=List[Category])
 async def get_categories(user_id: str = Depends(get_current_user)):
     categories = await db.categories.find({"user_id": user_id}, {"_id": 0}).to_list(1000)
@@ -479,6 +494,67 @@ async def create_category(cat_data: CategoryCreate, user_id: str = Depends(get_c
     await db.categories.insert_one(doc)
     return cat_obj
 
+# ── Habit Routes ── (saved to MongoDB, persists across logins)
+@api_router.get("/habits")
+async def get_habits(user_id: str = Depends(get_current_user)):
+    habits = await db.habits.find({"user_id": user_id}).to_list(1000)
+    for h in habits:
+        h["id"] = str(h["_id"])
+        del h["_id"]
+    return habits
+
+@api_router.post("/habits")
+async def create_habit(habit: HabitModel, user_id: str = Depends(get_current_user)):
+    doc = {
+        "user_id": user_id,
+        "name": habit.name,
+        "emoji": habit.emoji,
+        "history": [],
+        "streak": 0,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    result = await db.habits.insert_one(doc)
+    doc["id"] = str(result.inserted_id)
+    del doc["_id"]
+    return doc
+
+@api_router.put("/habits/{habit_id}/toggle")
+async def toggle_habit(habit_id: str, toggle: HabitToggle, user_id: str = Depends(get_current_user)):
+    habit = await db.habits.find_one({"_id": ObjectId(habit_id), "user_id": user_id})
+    if not habit:
+        raise HTTPException(status_code=404, detail="Habit not found")
+    history = habit.get("history", [])
+    if toggle.date in history:
+        history.remove(toggle.date)
+    else:
+        history.append(toggle.date)
+    # recalculate streak
+    streak = 0
+    today = date.today()
+    for i in range(30):
+        d = (today - timedelta(days=i)).isoformat()
+        if d in history:
+            streak += 1
+        else:
+            break
+    await db.habits.update_one(
+        {"_id": ObjectId(habit_id)},
+        {"$set": {"history": history, "streak": streak}}
+    )
+    habit["history"] = history
+    habit["streak"] = streak
+    habit["id"] = str(habit["_id"])
+    del habit["_id"]
+    return habit
+
+@api_router.delete("/habits/{habit_id}")
+async def delete_habit(habit_id: str, user_id: str = Depends(get_current_user)):
+    result = await db.habits.delete_one({"_id": ObjectId(habit_id), "user_id": user_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Habit not found")
+    return {"message": "Deleted"}
+
+# ── Quote Route ──
 @api_router.get("/daily-quote", response_model=DailyQuote)
 async def get_daily_quote():
     hours_since_epoch = int(datetime.now(timezone.utc).timestamp() / 3600)
@@ -498,6 +574,7 @@ async def get_daily_quote():
 async def root():
     return {"message": "Task Manager API"}
 
+# ── App Setup ──
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
