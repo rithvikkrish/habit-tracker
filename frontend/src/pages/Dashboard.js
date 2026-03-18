@@ -15,39 +15,12 @@ const CYAN  = '#00e5ff';
 const PURP  = '#bf5fff';
 const GRAD  = `linear-gradient(90deg,${CYAN},${PURP})`;
 
-/* ── Canvas Cursor ── */
-function CanvasCursor() {
-  const cvRef = useRef(null);
-  useEffect(() => {
-    const cv = cvRef.current; const ctx = cv.getContext('2d'); let aid;
-    const resize = () => { cv.width=window.innerWidth; cv.height=window.innerHeight; };
-    resize(); window.addEventListener('resize',resize);
-    const mouse={x:window.innerWidth/2,y:window.innerHeight/2};
-    window.addEventListener('mousemove',e=>{mouse.x=e.clientX;mouse.y=e.clientY;});
-    const T=[{color:CYAN,points:[],width:3.5},{color:PURP,points:[],width:2.8},{color:'#06b6d4',points:[],width:2.2},{color:'#a855f7',points:[],width:1.8}];
-    const lags=[0.1,0.07,0.05,0.035],pos=T.map(()=>({x:mouse.x,y:mouse.y})),MAX=90;
-    const drawT=t=>{
-      if(t.points.length<2)return;
-      [[0.1,50,t.width*5],[0.25,22,t.width*2]].forEach(([a,b,w])=>{ctx.save();ctx.globalAlpha=a;ctx.shadowBlur=b;ctx.shadowColor=t.color;ctx.strokeStyle=t.color;ctx.lineWidth=w;ctx.lineCap='round';ctx.lineJoin='round';ctx.beginPath();ctx.moveTo(t.points[0].x,t.points[0].y);for(let j=1;j<t.points.length-1;j++){const mx=(t.points[j].x+t.points[j+1].x)/2,my=(t.points[j].y+t.points[j+1].y)/2;ctx.quadraticCurveTo(t.points[j].x,t.points[j].y,mx,my);}ctx.stroke();ctx.restore();});
-      for(let j=1;j<t.points.length;j++){const a=j/t.points.length;ctx.save();ctx.globalAlpha=a*0.9;ctx.shadowBlur=12;ctx.shadowColor=t.color;ctx.strokeStyle=t.color;ctx.lineWidth=t.width*(0.3+a*0.7);ctx.lineCap='round';ctx.beginPath();ctx.moveTo(t.points[j-1].x,t.points[j-1].y);ctx.lineTo(t.points[j].x,t.points[j].y);ctx.stroke();ctx.restore();}
-    };
-    const animate=()=>{ctx.clearRect(0,0,cv.width,cv.height);T.forEach((t,i)=>{pos[i].x+=(mouse.x-pos[i].x)*lags[i];pos[i].y+=(mouse.y-pos[i].y)*lags[i];const angle=Math.atan2(mouse.y-pos[i].y,mouse.x-pos[i].x)+Math.PI/2,spread=(i-1.5)*7;t.points.push({x:pos[i].x+Math.cos(angle)*spread,y:pos[i].y+Math.sin(angle)*spread});if(t.points.length>MAX)t.points.shift();drawT(t);});aid=requestAnimationFrame(animate);};
-    animate();
-    const onClick=()=>{const rc=()=>'#'+Math.floor(Math.random()*16777215).toString(16).padStart(6,'0');T.forEach(t=>t.color=rc());};
-    document.body.addEventListener('click',onClick);
-    return()=>{window.removeEventListener('resize',resize);cancelAnimationFrame(aid);document.body.removeEventListener('click',onClick);};
-  },[]);
-  return <canvas ref={cvRef} style={{position:'fixed',inset:0,zIndex:9999,pointerEvents:'none'}}/>;
-}
-
-/* ── Stars + Shooting Stars + Matrix BG (same as AuthPage) ── */
 function AuthStyleBG() {
   const cvRef = useRef(null);
   useEffect(()=>{
     const cv=cvRef.current; const ctx=cv.getContext('2d'); let aid;
     const resize=()=>{ cv.width=window.innerWidth; cv.height=window.innerHeight; };
     resize(); window.addEventListener('resize',resize);
-
     const stars=Array.from({length:200},()=>({
       x:Math.random()*cv.width, y:Math.random()*cv.height,
       r:Math.random()*1.9+0.3,
@@ -55,73 +28,21 @@ function AuthStyleBG() {
       tw:Math.random()*Math.PI*2, sp:Math.random()*0.008+0.003,
       pulse:Math.random()>0.6
     }));
-
     let shooters=[];
-    const spawn=()=>shooters.push({
-      x:Math.random()*cv.width*0.7, y:Math.random()*cv.height*0.4,
-      len:100+Math.random()*80, op:1, spd:6+Math.random()*4,
-      a:Math.PI/4+(Math.random()-0.5)*0.3,
-      color:Math.random()>0.5?CYAN:PURP
-    });
-
+    const spawn=()=>shooters.push({x:Math.random()*cv.width*0.7,y:Math.random()*cv.height*0.4,len:100+Math.random()*80,op:1,spd:6+Math.random()*4,a:Math.PI/4+(Math.random()-0.5)*0.3,color:Math.random()>0.5?CYAN:PURP});
     const fontSize=13;
     let drops=Array(Math.floor(cv.width/fontSize)).fill(0).map(()=>Math.random()*50);
     const chars='アイウエオカキクケコサシスセソタチツテト0123456789ABCDEF';
     let frame=0;
-
     const draw=()=>{
       frame++;
-      ctx.fillStyle='rgba(8,10,28,0.14)';
-      ctx.fillRect(0,0,cv.width,cv.height);
-
-      // Nebula
-      [{x:0.15,y:0.25,r:280,c:'rgba(99,102,241,0.05)'},{x:0.85,y:0.75,r:320,c:'rgba(139,92,246,0.04)'},{x:0.5,y:0.5,r:220,c:'rgba(6,182,212,0.03)'}].forEach(n=>{
-        const g=ctx.createRadialGradient(n.x*cv.width,n.y*cv.height,0,n.x*cv.width,n.y*cv.height,n.r);
-        g.addColorStop(0,n.c);g.addColorStop(1,'transparent');
-        ctx.fillStyle=g;ctx.fillRect(0,0,cv.width,cv.height);
-      });
-
-      // Stars
-      stars.forEach(s=>{
-        s.tw+=s.sp;
-        const op=s.pulse?0.15+0.85*(0.5+0.5*Math.sin(s.tw)):0.35+0.45*(0.5+0.5*Math.sin(s.tw));
-        ctx.save();ctx.globalAlpha=op;
-        ctx.shadowBlur=s.pulse?10:3;ctx.shadowColor=s.color;
-        ctx.fillStyle=s.color;ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);ctx.fill();
-        if(s.pulse&&op>0.75){ctx.globalAlpha=op*0.35;ctx.strokeStyle=s.color;ctx.lineWidth=0.5;ctx.beginPath();ctx.moveTo(s.x-s.r*4,s.y);ctx.lineTo(s.x+s.r*4,s.y);ctx.moveTo(s.x,s.y-s.r*4);ctx.lineTo(s.x,s.y+s.r*4);ctx.stroke();}
-        ctx.restore();
-      });
-
-      // Shooting stars
+      ctx.fillStyle='rgba(8,10,28,0.14)';ctx.fillRect(0,0,cv.width,cv.height);
+      [{x:0.15,y:0.25,r:280,c:'rgba(99,102,241,0.05)'},{x:0.85,y:0.75,r:320,c:'rgba(139,92,246,0.04)'},{x:0.5,y:0.5,r:220,c:'rgba(6,182,212,0.03)'}].forEach(n=>{const g=ctx.createRadialGradient(n.x*cv.width,n.y*cv.height,0,n.x*cv.width,n.y*cv.height,n.r);g.addColorStop(0,n.c);g.addColorStop(1,'transparent');ctx.fillStyle=g;ctx.fillRect(0,0,cv.width,cv.height);});
+      stars.forEach(s=>{s.tw+=s.sp;const op=s.pulse?0.15+0.85*(0.5+0.5*Math.sin(s.tw)):0.35+0.45*(0.5+0.5*Math.sin(s.tw));ctx.save();ctx.globalAlpha=op;ctx.shadowBlur=s.pulse?10:3;ctx.shadowColor=s.color;ctx.fillStyle=s.color;ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);ctx.fill();if(s.pulse&&op>0.75){ctx.globalAlpha=op*0.35;ctx.strokeStyle=s.color;ctx.lineWidth=0.5;ctx.beginPath();ctx.moveTo(s.x-s.r*4,s.y);ctx.lineTo(s.x+s.r*4,s.y);ctx.moveTo(s.x,s.y-s.r*4);ctx.lineTo(s.x,s.y+s.r*4);ctx.stroke();}ctx.restore();});
       if(frame%220===0)spawn();
       shooters=shooters.filter(s=>s.op>0);
-      shooters.forEach(s=>{
-        ctx.save();ctx.globalAlpha=s.op;
-        const g=ctx.createLinearGradient(s.x,s.y,s.x-Math.cos(s.a)*s.len,s.y-Math.sin(s.a)*s.len);
-        g.addColorStop(0,s.color);g.addColorStop(1,'transparent');
-        ctx.strokeStyle=g;ctx.lineWidth=1.5;ctx.shadowBlur=10;ctx.shadowColor=s.color;
-        ctx.beginPath();ctx.moveTo(s.x,s.y);ctx.lineTo(s.x-Math.cos(s.a)*s.len,s.y-Math.sin(s.a)*s.len);
-        ctx.stroke();ctx.restore();
-        s.x+=s.spd;s.y+=s.spd;s.op-=0.018;
-      });
-
-      // Matrix rain (slow, subtle)
-      if(frame%9===0){
-        const cols=Math.floor(cv.width/fontSize);
-        if(drops.length!==cols)drops=Array(cols).fill(0).map(()=>Math.random()*50);
-        ctx.font=`${fontSize}px monospace`;
-        for(let i=0;i<cols;i++){
-          const ch=chars[Math.floor(Math.random()*chars.length)];
-          const op=0.05+Math.random()*0.09;
-          ctx.fillStyle=`rgba(0,229,255,${op})`;
-          ctx.shadowBlur=3;ctx.shadowColor=CYAN;
-          ctx.fillText(ch,i*fontSize,drops[i]*fontSize);
-          if(drops[i]*fontSize>cv.height&&Math.random()>0.975)drops[i]=0;
-          drops[i]+=0.38;
-        }
-        ctx.shadowBlur=0;
-      }
-
+      shooters.forEach(s=>{ctx.save();ctx.globalAlpha=s.op;const g=ctx.createLinearGradient(s.x,s.y,s.x-Math.cos(s.a)*s.len,s.y-Math.sin(s.a)*s.len);g.addColorStop(0,s.color);g.addColorStop(1,'transparent');ctx.strokeStyle=g;ctx.lineWidth=1.5;ctx.shadowBlur=10;ctx.shadowColor=s.color;ctx.beginPath();ctx.moveTo(s.x,s.y);ctx.lineTo(s.x-Math.cos(s.a)*s.len,s.y-Math.sin(s.a)*s.len);ctx.stroke();ctx.restore();s.x+=s.spd;s.y+=s.spd;s.op-=0.018;});
+      if(frame%9===0){const cols=Math.floor(cv.width/fontSize);if(drops.length!==cols)drops=Array(cols).fill(0).map(()=>Math.random()*50);ctx.font=`${fontSize}px monospace`;for(let i=0;i<cols;i++){const ch=chars[Math.floor(Math.random()*chars.length)];const op=0.05+Math.random()*0.09;ctx.fillStyle=`rgba(0,229,255,${op})`;ctx.shadowBlur=3;ctx.shadowColor=CYAN;ctx.fillText(ch,i*fontSize,drops[i]*fontSize);if(drops[i]*fontSize>cv.height&&Math.random()>0.975)drops[i]=0;drops[i]+=0.38;}ctx.shadowBlur=0;}
       aid=requestAnimationFrame(draw);
     };
     draw();
@@ -130,7 +51,6 @@ function AuthStyleBG() {
   return <canvas ref={cvRef} style={{position:'fixed',inset:0,zIndex:0,pointerEvents:'none'}}/>;
 }
 
-/* ── Confetti ── */
 function Confetti({active,onDone}) {
   const cvRef=useRef(null);
   useEffect(()=>{
@@ -139,14 +59,12 @@ function Confetti({active,onDone}) {
     cv.width=window.innerWidth;cv.height=window.innerHeight;
     const p=Array.from({length:80},()=>({x:Math.random()*cv.width,y:-10,vx:(Math.random()-0.5)*6,vy:Math.random()*4+2,color:[CYAN,PURP,'#10b981','#f59e0b','#fff'][Math.floor(Math.random()*5)],r:Math.random()*5+2,life:1}));
     let aid;
-    const draw=()=>{ctx.clearRect(0,0,cv.width,cv.height);let alive=false;p.forEach(pt=>{pt.x+=pt.vx;pt.y+=pt.vy;pt.life-=0.015;pt.vy+=0.1;if(pt.life>0){alive=true;ctx.save();ctx.globalAlpha=pt.life;ctx.fillStyle=pt.color;ctx.shadowBlur=6;ctx.shadowColor=pt.color;ctx.beginPath();ctx.arc(pt.x,pt.y,pt.r,0,Math.PI*2);ctx.fill();ctx.restore();}});
-    if(alive)aid=requestAnimationFrame(draw);else onDone();};
+    const draw=()=>{ctx.clearRect(0,0,cv.width,cv.height);let alive=false;p.forEach(pt=>{pt.x+=pt.vx;pt.y+=pt.vy;pt.life-=0.015;pt.vy+=0.1;if(pt.life>0){alive=true;ctx.save();ctx.globalAlpha=pt.life;ctx.fillStyle=pt.color;ctx.shadowBlur=6;ctx.shadowColor=pt.color;ctx.beginPath();ctx.arc(pt.x,pt.y,pt.r,0,Math.PI*2);ctx.fill();ctx.restore();}});if(alive)aid=requestAnimationFrame(draw);else onDone();};
     draw();return()=>cancelAnimationFrame(aid);
   },[active]);
   return <canvas ref={cvRef} style={{position:'fixed',inset:0,zIndex:99998,pointerEvents:'none',display:active?'block':'none'}}/>;
 }
 
-/* ── Clock ── */
 function Clock() {
   const [t,setT]=useState({time:'',ampm:'',date:''});
   useEffect(()=>{
@@ -166,7 +84,6 @@ function Clock() {
   );
 }
 
-/* ── Bar Chart ── */
 function BarChart({data,colorFn}) {
   const max=Math.max(...data.map(d=>d.value),1);
   return (
@@ -182,7 +99,6 @@ function BarChart({data,colorFn}) {
   );
 }
 
-/* ── Habit Heatmap ── */
 function HabitHeatmap({history}) {
   const weeks=18,days=weeks*7;
   const cells=Array.from({length:days},(_,i)=>{const d=new Date();d.setDate(d.getDate()-(days-1-i));return{date:d.toISOString().split('T')[0],done:history?.includes(d.toISOString().split('T')[0])};});
@@ -231,6 +147,7 @@ export default function Dashboard() {
   const [newCatColor,setNewCatColor]=useState('#00e5ff');
   const [notifEnabled,setNotifEnabled]=useState(false);
   const [loading,setLoading]=useState(true);
+  const [showProfileMenu,setShowProfileMenu]=useState(false);
 
   const fetchTasks=async()=>{try{const r=await api.get('/api/tasks');setTasks(r.data);}catch{}};
   const fetchCategories=async()=>{try{const r=await api.get('/api/categories');setCategories(r.data);}catch{}};
@@ -263,7 +180,7 @@ export default function Dashboard() {
   const enableNotifications=async()=>{
     if(!('Notification' in window)){alert('Browser does not support notifications');return;}
     const perm=await Notification.requestPermission();
-    if(perm==='granted'){setNotifEnabled(true);new Notification('🔔 TaskMaster Notifications',{body:'You will now get streak reminders!'});}
+    if(perm==='granted'){setNotifEnabled(true);new Notification('🔔 TaskMaster',{body:'Streak reminders enabled!'});}
   };
 
   const logout=()=>{localStorage.clear();window.location.href='/auth';};
@@ -277,7 +194,6 @@ export default function Dashboard() {
   const toggleHabit=async(id)=>{const today=new Date().toISOString().split('T')[0];try{await api.put(`/api/habits/${id}/toggle`,{date:today});fetchHabits();}catch{}};
   const deleteHabit=async(id)=>{try{await api.delete(`/api/habits/${id}`);fetchHabits();}catch{}};
   const saveEditHabit=async()=>{if(!editHabit)return;try{await api.put(`/api/habits/${editHabit.id}/edit`,{name:editHabit.name,emoji:editHabit.emoji});fetchHabits();setEditHabit(null);}catch{setEditHabit(null);}};
-
   const addCategory=async()=>{if(!newCatName.trim())return;try{await api.post('/api/categories',{name:newCatName,color:newCatColor});setNewCatName('');setShowAddCat(false);fetchCategories();}catch{}};
 
   const getLast7=()=>Array.from({length:7},(_,i)=>{const d=new Date();d.setDate(d.getDate()-(6-i));return d.toISOString().split('T')[0];});
@@ -325,7 +241,21 @@ export default function Dashboard() {
   const btn={background:`linear-gradient(135deg,rgba(0,229,255,0.15),rgba(191,95,255,0.28))`,border:`1px solid rgba(0,229,255,0.32)`,borderRadius:10,color:'#fff',padding:'11px 24px',cursor:'pointer',fontWeight:700,fontSize:'0.875rem',fontFamily:FONT,transition:'all 0.2s',boxShadow:`0 0 18px rgba(0,229,255,0.1)`};
   const periodBtn=p=>({padding:'7px 18px',borderRadius:8,border:analyticsPeriod===p?`1px solid rgba(0,229,255,0.4)`:'1px solid rgba(255,255,255,0.08)',cursor:'pointer',fontFamily:FONT,fontWeight:700,fontSize:'0.8rem',background:analyticsPeriod===p?`linear-gradient(135deg,rgba(0,229,255,0.15),rgba(191,95,255,0.2))`:'transparent',color:analyticsPeriod===p?CYAN:'rgba(255,255,255,0.35)',transition:'all 0.2s'});
 
-  /* ── Loading screen ── */
+  const Avatar=({size=32})=>(
+    <div style={{width:size,height:size,borderRadius:'50%',background:GRAD,display:'flex',alignItems:'center',justifyContent:'center',fontWeight:800,overflow:'hidden',boxShadow:`0 0 10px rgba(99,102,241,0.35)`,flexShrink:0,fontSize:size*0.4}}>
+      {user.profile_pic?<img src={user.profile_pic} alt="av" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{color:'#fff'}}>{(user.name||'U').charAt(0).toUpperCase()}</span>}
+    </div>
+  );
+
+  const MenuItem=({icon,label,sub,color,onClick})=>(
+    <button onClick={onClick} style={{width:'100%',padding:'10px 18px',display:'flex',alignItems:'center',gap:12,background:'transparent',border:'none',color:color||'rgba(255,255,255,0.72)',cursor:'pointer',fontFamily:FONT,fontSize:'0.875rem',fontWeight:500,textAlign:'left',transition:'all 0.15s'}}
+      onMouseEnter={e=>{e.currentTarget.style.background=color?'rgba(239,68,68,0.1)':'rgba(99,102,241,0.12)';e.currentTarget.style.color=color||'#fff';}}
+      onMouseLeave={e=>{e.currentTarget.style.background='transparent';e.currentTarget.style.color=color||'rgba(255,255,255,0.72)';}}>
+      <span style={{fontSize:'1rem',width:20,textAlign:'center',flexShrink:0}}>{icon}</span>
+      <div><div>{label}</div>{sub&&<div style={{fontSize:'0.7rem',color:'rgba(255,255,255,0.3)',marginTop:1}}>{sub}</div>}</div>
+    </button>
+  );
+
   if(loading){
     return(
       <div style={{minHeight:'100vh',background:'#08091c',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',fontFamily:FONT}}>
@@ -334,9 +264,7 @@ export default function Dashboard() {
           <div style={{fontSize:'3rem',marginBottom:16}}>⚡</div>
           <div style={{fontSize:'1.5rem',fontWeight:800,background:GRAD,WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',marginBottom:14}}>TaskMaster</div>
           <div style={{display:'flex',gap:8,justifyContent:'center',marginBottom:14}}>
-            {[0,1,2].map(i=>(
-              <div key={i} style={{width:10,height:10,borderRadius:'50%',background:GRAD,animation:`loadBounce 1.2s ease-in-out ${i*0.2}s infinite`}}/>
-            ))}
+            {[0,1,2].map(i=>(<div key={i} style={{width:10,height:10,borderRadius:'50%',background:GRAD,animation:`loadBounce 1.2s ease-in-out ${i*0.2}s infinite`}}/>))}
           </div>
           <div style={{color:'rgba(255,255,255,0.35)',fontSize:'0.85rem'}}>Loading your workspace...</div>
         </div>
@@ -358,8 +286,6 @@ export default function Dashboard() {
         select option{background:#08091c;color:#fff;}
         input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) opacity(0.4);}
         textarea{resize:vertical;}
-
-        /* ── Mobile responsive ── */
         .dash-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:28px;}
         .dash-quote{display:flex;align-items:stretch;min-height:155px;}
         .dash-tabs{display:flex;gap:4px;margin-bottom:24px;background:rgba(10,12,30,0.7);padding:5px;border-radius:12px;border:1px solid rgba(99,102,241,0.12);width:fit-content;overflow-x:auto;max-width:100%;}
@@ -369,11 +295,9 @@ export default function Dashboard() {
         .dash-analytics-3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
         .dash-analytics-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;}
         .dash-cat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;}
-
         @media(max-width:768px){
           .dash-stats{grid-template-columns:repeat(2,1fr)!important;gap:10px!important;}
           .dash-quote{flex-direction:column!important;}
-          .dash-clock-mobile{min-width:unset!important;width:100%!important;border-left:none!important;border-top:1px solid rgba(255,255,255,0.06)!important;padding:16px 24px!important;flex-direction:row!important;gap:20px!important;justify-content:center!important;}
           .dash-tabs{width:100%!important;}
           .dash-filters{flex-direction:column!important;}
           .dash-task-row{flex-direction:column!important;align-items:flex-start!important;}
@@ -383,7 +307,6 @@ export default function Dashboard() {
           .dash-cat-grid{grid-template-columns:repeat(2,1fr)!important;}
           .dash-main{padding:16px 14px!important;}
           .dash-nav{padding:0 16px!important;height:56px!important;}
-          .dash-nav-name{display:none!important;}
         }
         @media(max-width:480px){
           .dash-stats{grid-template-columns:repeat(2,1fr)!important;}
@@ -393,25 +316,58 @@ export default function Dashboard() {
       `}</style>
 
       <AuthStyleBG/>
-      <CanvasCursor/>
       <Confetti active={confetti} onDone={()=>setConfetti(false)}/>
 
       {/* ── Navbar ── */}
       <nav className="dash-nav" style={{position:'relative',zIndex:10,background:'rgba(8,10,28,0.92)',backdropFilter:'blur(20px)',borderBottom:`1px solid rgba(99,102,241,0.15)`,padding:'0 32px',display:'flex',alignItems:'center',justifyContent:'space-between',height:64,boxShadow:'0 2px 24px rgba(0,0,0,0.6)'}}>
         <span style={{fontWeight:800,fontSize:'clamp(1.1rem,2.5vw,1.4rem)',background:GRAD,WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>⚡ TaskMaster</span>
-        <div style={{display:'flex',alignItems:'center',gap:10}}>
-          {!notifEnabled&&(
-            <button onClick={enableNotifications} style={{background:'rgba(99,102,241,0.1)',border:`1px solid rgba(99,102,241,0.25)`,borderRadius:8,color:'rgba(167,139,250,0.9)',padding:'6px 12px',cursor:'pointer',fontFamily:FONT,fontSize:'0.75rem',fontWeight:600}}>🔔 Reminders</button>
+
+        {/* Profile dropdown */}
+        <div style={{position:'relative'}}>
+          <button onClick={()=>setShowProfileMenu(!showProfileMenu)}
+            style={{display:'flex',alignItems:'center',gap:9,background:'rgba(99,102,241,0.1)',border:'1px solid rgba(99,102,241,0.2)',borderRadius:24,padding:'5px 14px 5px 5px',cursor:'pointer',transition:'all 0.2s'}}
+            onMouseEnter={e=>e.currentTarget.style.borderColor='rgba(99,102,241,0.45)'}
+            onMouseLeave={e=>e.currentTarget.style.borderColor='rgba(99,102,241,0.2)'}>
+            <Avatar size={32}/>
+            <span style={{color:'rgba(255,255,255,0.78)',fontSize:'0.85rem',fontFamily:FONT,fontWeight:600,maxWidth:100,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{user.name||'User'}</span>
+            <span style={{color:'rgba(255,255,255,0.35)',fontSize:'0.7rem',display:'inline-block',transition:'transform 0.2s',transform:showProfileMenu?'rotate(180deg)':'none'}}>▼</span>
+          </button>
+
+          {showProfileMenu&&(
+            <>
+              <div onClick={()=>setShowProfileMenu(false)} style={{position:'fixed',inset:0,zIndex:19}}/>
+              <div style={{position:'absolute',top:'calc(100% + 10px)',right:0,zIndex:20,background:'rgba(10,12,35,0.97)',backdropFilter:'blur(20px)',border:'1px solid rgba(99,102,241,0.2)',borderRadius:14,overflow:'hidden',minWidth:230,boxShadow:'0 16px 48px rgba(0,0,0,0.7)',animation:'slideIn 0.15s ease'}}>
+
+                {/* Header */}
+                <div style={{padding:'14px 18px',borderBottom:'1px solid rgba(99,102,241,0.1)',display:'flex',alignItems:'center',gap:12}}>
+                  <Avatar size={40}/>
+                  <div style={{overflow:'hidden',flex:1}}>
+                    <div style={{fontWeight:700,fontSize:'0.92rem',color:'#fff',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{user.name||'User'}</div>
+                    <div style={{fontSize:'0.72rem',color:'rgba(255,255,255,0.35)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{user.email||''}</div>
+                  </div>
+                </div>
+
+                <div style={{padding:'6px 0'}}>
+                  <MenuItem icon="👤" label="Edit Profile" sub="View your stats & info" onClick={()=>{setShowProfileMenu(false);setActiveTab('profile');}}/>
+                  <MenuItem icon="💬" label="Send Feedback" sub="Tell us what you think" onClick={()=>{setShowProfileMenu(false);window.open('mailto:rithvikkrishna1618@gmail.com?subject=TaskMaster Feedback','_blank');}}/>
+                  <MenuItem icon="❓" label="Help & Support" sub="GitHub issues" onClick={()=>{setShowProfileMenu(false);window.open('https://github.com/rithvikkrish/habit-tracker/issues','_blank');}}/>
+                  <MenuItem icon="🔔" label={notifEnabled?'Reminders On ✓':'Enable Reminders'} sub={notifEnabled?'Streak alerts active':'Get streak alerts'} onClick={()=>{setShowProfileMenu(false);if(!notifEnabled)enableNotifications();}}/>
+                </div>
+
+                <div style={{height:1,background:'rgba(99,102,241,0.12)'}}/>
+
+                <div style={{padding:'6px 0'}}>
+                  <MenuItem icon="🚪" label="Logout" color="rgba(239,68,68,0.8)" onClick={()=>{setShowProfileMenu(false);logout();}}/>
+                </div>
+              </div>
+            </>
           )}
-          {notifEnabled&&<span style={{fontSize:'0.78rem',color:'rgba(0,229,255,0.5)'}}>🔔</span>}
-          <span className="dash-nav-name" style={{color:'rgba(255,255,255,0.4)',fontSize:'0.88rem',fontFamily:EMOJI}}>Hey, {user.name||'User'} 👋</span>
-          <button onClick={logout} style={{background:'transparent',border:'1px solid rgba(255,255,255,0.1)',borderRadius:9,color:'rgba(255,255,255,0.5)',padding:'7px 16px',cursor:'pointer',fontFamily:FONT,fontSize:'0.82rem'}}>Logout</button>
         </div>
       </nav>
 
       <div className="dash-main" style={{position:'relative',zIndex:5,maxWidth:1200,margin:'0 auto',padding:'28px 24px'}}>
 
-        {/* ── Quote + Clock ── */}
+        {/* Quote + Clock */}
         {dailyQuote&&(
           <div className="dash-quote" style={{...card,marginBottom:26,animation:'fadeUp 0.5s ease',padding:0,overflow:'hidden',border:`1px solid rgba(99,102,241,0.2)`,boxShadow:'0 4px 40px rgba(0,0,0,0.5)'}}>
             <div style={{display:'flex',alignItems:'center',gap:22,padding:'22px 28px',flex:1}}>
@@ -428,7 +384,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* ── Stats ── */}
+        {/* Stats */}
         <div className="dash-stats">
           {[{label:'TOTAL TASKS',value:total,icon:'🗒️'},{label:'COMPLETED',value:done,icon:'✅'},{label:'HABITS',value:habits.length,icon:'🔥'},{label:'CATEGORIES',value:categories.length,icon:'🗂️'}].map((st,i)=>(
             <div key={st.label} style={{...card,textAlign:'center',padding:'26px 14px',transition:'all 0.25s',cursor:'default',animation:`fadeUp ${0.25+i*0.07}s ease`}}
@@ -441,21 +397,20 @@ export default function Dashboard() {
           ))}
         </div>
 
-        {/* ── Tabs ── */}
+        {/* Tabs */}
         <div className="dash-tabs">
-          {[{id:'tasks',label:'📋 Tasks'},{id:'habits',label:'🧡 Habits'},{id:'analytics',label:'📊 Analytics'},{id:'categories',label:'🗂️ Categories'}].map(tab=>(
+          {[{id:'tasks',label:'📋 Tasks'},{id:'habits',label:'🧡 Habits'},{id:'analytics',label:'📊 Analytics'},{id:'categories',label:'🗂️ Categories'},{id:'profile',label:'👤 Profile'}].map(tab=>(
             <button key={tab.id} onClick={()=>setActiveTab(tab.id)} style={{padding:'8px 18px',borderRadius:9,border:activeTab===tab.id?`1px solid rgba(99,102,241,0.4)`:'1px solid transparent',cursor:'pointer',fontFamily:FONT,fontWeight:700,fontSize:'0.83rem',transition:'all 0.2s',background:activeTab===tab.id?`linear-gradient(135deg,rgba(99,102,241,0.2),rgba(139,92,246,0.2))`:'transparent',color:activeTab===tab.id?'#fff':'rgba(255,255,255,0.35)',boxShadow:activeTab===tab.id?`0 0 16px rgba(99,102,241,0.15)`:'none',whiteSpace:'nowrap'}}>{tab.label}</button>
           ))}
         </div>
 
-        {/* ══ TASKS ══ */}
+        {/* TASKS */}
         {activeTab==='tasks'&&(
           <div style={{animation:'fadeUp 0.3s ease'}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14,flexWrap:'wrap',gap:10}}>
               <h2 style={{margin:0,fontSize:'1.15rem',fontWeight:700}}><span style={{fontFamily:EMOJI}}>🗒️</span> My Tasks</h2>
               <button onClick={()=>setShowAdd(!showAdd)} style={btn}>+ Add Task</button>
             </div>
-
             <div className="dash-filters">
               <input style={{...inp,flex:2,minWidth:160}} placeholder="🔍 Search tasks..." value={searchQ} onChange={e=>setSearchQ(e.target.value)}/>
               <select style={{...sel,flex:1,minWidth:120}} value={filterCat} onChange={e=>setFilterCat(e.target.value)}>
@@ -464,12 +419,9 @@ export default function Dashboard() {
               </select>
               <select style={{...sel,flex:1,minWidth:110}} value={filterPri} onChange={e=>setFilterPri(e.target.value)}>
                 <option value="all">All Priorities</option>
-                <option value="high">🔴 High</option>
-                <option value="medium">🟡 Medium</option>
-                <option value="low">🟢 Low</option>
+                <option value="high">🔴 High</option><option value="medium">🟡 Medium</option><option value="low">🟢 Low</option>
               </select>
             </div>
-
             {showAdd&&(
               <form onSubmit={addTask} style={{...card,marginBottom:14,display:'flex',flexDirection:'column',gap:11,border:`1px solid rgba(99,102,241,0.25)`,animation:'slideIn 0.2s ease'}}>
                 <input style={inp} placeholder="Task title *" value={newTask.title} onChange={e=>setNewTask({...newTask,title:e.target.value})} required/>
@@ -489,7 +441,6 @@ export default function Dashboard() {
                 </div>
               </form>
             )}
-
             {editTask&&(
               <form onSubmit={saveEditTask} style={{...card,marginBottom:14,display:'flex',flexDirection:'column',gap:11,border:`1px solid rgba(0,229,255,0.28)`,animation:'slideIn 0.2s ease',boxShadow:`0 0 20px rgba(0,229,255,0.08)`}}>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
@@ -513,7 +464,6 @@ export default function Dashboard() {
                 </div>
               </form>
             )}
-
             <div style={{display:'flex',flexDirection:'column',gap:9}}>
               {filteredTasks.length===0&&(
                 <div style={{...card,textAlign:'center',padding:46,border:'1px solid rgba(99,102,241,0.1)'}}>
@@ -561,35 +511,29 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* ══ HABITS ══ */}
+        {/* HABITS */}
         {activeTab==='habits'&&(
           <div style={{animation:'fadeUp 0.3s ease'}}>
             <h2 style={{marginBottom:16,fontSize:'1.15rem',fontWeight:700}}><span style={{fontFamily:EMOJI}}>💪</span> My Habits</h2>
-
             {habits.filter(h=>{const t=new Date().toISOString().split('T')[0];const y=new Date(Date.now()-86400000).toISOString().split('T')[0];return h.streak>0&&!h.history?.includes(t)&&h.history?.includes(y);}).length>0&&(
               <div style={{...card,marginBottom:12,background:'rgba(245,158,11,0.07)',border:'1px solid rgba(245,158,11,0.22)',padding:'11px 16px',display:'flex',alignItems:'center',gap:9}}>
                 <span style={{fontFamily:EMOJI}}>⚠️</span>
                 <span style={{fontSize:'0.83rem',color:'#f59e0b',fontWeight:600}}>Streaks at risk today! Mark your habits done before midnight.</span>
               </div>
             )}
-
             <div style={{...card,marginBottom:12,background:'rgba(0,229,255,0.04)',border:`1px solid rgba(0,229,255,0.12)`,padding:'11px 16px',display:'flex',alignItems:'center',gap:9}}>
               <span style={{fontFamily:EMOJI}}>☁️</span>
               <span style={{fontSize:'0.83rem',color:'rgba(0,229,255,0.75)'}}>Habits saved to cloud — persist across logins!</span>
             </div>
-
             <div style={{...card,marginBottom:14,display:'flex',flexDirection:'column',gap:11,border:`1px solid rgba(99,102,241,0.15)`}}>
               <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
-                {emojis.map(e=>(
-                  <button key={e} onClick={()=>setHabitEmoji(e)} style={{background:habitEmoji===e?`rgba(99,102,241,0.2)`:'transparent',border:habitEmoji===e?`1px solid rgba(99,102,241,0.45)`:'1px solid rgba(255,255,255,0.07)',borderRadius:9,padding:'5px 8px',cursor:'pointer',fontSize:'1.3rem',transition:'all 0.2s',fontFamily:EMOJI}}>{e}</button>
-                ))}
+                {emojis.map(e=>(<button key={e} onClick={()=>setHabitEmoji(e)} style={{background:habitEmoji===e?`rgba(99,102,241,0.2)`:'transparent',border:habitEmoji===e?`1px solid rgba(99,102,241,0.45)`:'1px solid rgba(255,255,255,0.07)',borderRadius:9,padding:'5px 8px',cursor:'pointer',fontSize:'1.3rem',transition:'all 0.2s',fontFamily:EMOJI}}>{e}</button>))}
               </div>
               <div style={{display:'flex',gap:9}}>
                 <input style={inp} placeholder="New habit name..." value={newHabit} onChange={e=>setNewHabit(e.target.value)} onKeyPress={e=>e.key==='Enter'&&addHabit()}/>
                 <button onClick={addHabit} style={btn}>Add</button>
               </div>
             </div>
-
             {habitsLoading&&<div style={{...card,textAlign:'center',padding:32,color:'rgba(255,255,255,0.3)'}}>Loading habits...</div>}
             {!habitsLoading&&habits.length===0&&(
               <div style={{...card,textAlign:'center',padding:44,border:'1px solid rgba(99,102,241,0.1)'}}>
@@ -598,7 +542,6 @@ export default function Dashboard() {
                 <div style={{color:'rgba(255,255,255,0.22)',fontSize:'0.85rem'}}>Add your first habit above</div>
               </div>
             )}
-
             <div style={{display:'flex',flexDirection:'column',gap:11}}>
               {habits.map(habit=>{
                 const today=new Date().toISOString().split('T')[0];
@@ -610,11 +553,7 @@ export default function Dashboard() {
                   <div key={habit.id} style={{...card,border:atRisk?'1px solid rgba(245,158,11,0.28)':doneToday?'1px solid rgba(16,185,129,0.18)':'1px solid rgba(99,102,241,0.12)',transition:'all 0.2s'}}>
                     {editHabit?.id===habit.id?(
                       <div style={{display:'flex',gap:9,flexWrap:'wrap',alignItems:'center'}}>
-                        <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
-                          {emojis.map(e=>(
-                            <button key={e} onClick={()=>setEditHabit({...editHabit,emoji:e})} style={{background:editHabit.emoji===e?`rgba(99,102,241,0.2)`:'transparent',border:editHabit.emoji===e?`1px solid rgba(99,102,241,0.4)`:'1px solid transparent',borderRadius:8,padding:'3px 6px',cursor:'pointer',fontSize:'1.1rem',fontFamily:EMOJI}}>{e}</button>
-                          ))}
-                        </div>
+                        <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>{emojis.map(e=>(<button key={e} onClick={()=>setEditHabit({...editHabit,emoji:e})} style={{background:editHabit.emoji===e?`rgba(99,102,241,0.2)`:'transparent',border:editHabit.emoji===e?`1px solid rgba(99,102,241,0.4)`:'1px solid transparent',borderRadius:8,padding:'3px 6px',cursor:'pointer',fontSize:'1.1rem',fontFamily:EMOJI}}>{e}</button>))}</div>
                         <input style={{...inp,flex:1,minWidth:130}} value={editHabit.name} onChange={e=>setEditHabit({...editHabit,name:e.target.value})}/>
                         <button onClick={saveEditHabit} style={{...btn,padding:'8px 14px'}}>Save</button>
                         <button onClick={()=>setEditHabit(null)} style={{...btn,padding:'8px 12px',background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',boxShadow:'none'}}>✕</button>
@@ -630,11 +569,7 @@ export default function Dashboard() {
                               {doneToday&&<span style={{fontSize:'0.62rem',padding:'2px 7px',borderRadius:7,background:'rgba(16,185,129,0.1)',color:'#10b981',border:'1px solid rgba(16,185,129,0.22)',fontWeight:700}}>✅ Done</span>}
                             </div>
                             <div style={{display:'flex',gap:3,flexWrap:'wrap'}}>
-                              {getLast7().map(day=>(
-                                <div key={day} title={day} style={{width:26,height:26,borderRadius:6,background:habit.history?.includes(day)?GRAD:'rgba(255,255,255,0.05)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.6rem',fontWeight:700,color:habit.history?.includes(day)?'#fff':'rgba(255,255,255,0.25)',boxShadow:habit.history?.includes(day)?`0 0 8px rgba(0,229,255,0.3)`:'none'}}>
-                                  {new Date(day).getDate()}
-                                </div>
-                              ))}
+                              {getLast7().map(day=>(<div key={day} title={day} style={{width:26,height:26,borderRadius:6,background:habit.history?.includes(day)?GRAD:'rgba(255,255,255,0.05)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.6rem',fontWeight:700,color:habit.history?.includes(day)?'#fff':'rgba(255,255,255,0.25)',boxShadow:habit.history?.includes(day)?`0 0 8px rgba(0,229,255,0.3)`:'none'}}>{new Date(day).getDate()}</div>))}
                             </div>
                           </div>
                           <div style={{display:'flex',alignItems:'center',gap:7,flexWrap:'wrap'}}>
@@ -668,7 +603,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* ══ CATEGORIES ══ */}
+        {/* CATEGORIES */}
         {activeTab==='categories'&&(
           <div style={{animation:'fadeUp 0.3s ease'}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
@@ -678,11 +613,7 @@ export default function Dashboard() {
             {showAddCat&&(
               <div style={{...card,marginBottom:14,display:'flex',gap:11,flexWrap:'wrap',alignItems:'center',border:`1px solid rgba(99,102,241,0.25)`,animation:'slideIn 0.2s ease'}}>
                 <input style={{...inp,flex:1,minWidth:160}} placeholder="Category name" value={newCatName} onChange={e=>setNewCatName(e.target.value)}/>
-                <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
-                  {catColors.map(c=>(
-                    <button key={c} onClick={()=>setNewCatColor(c)} style={{width:26,height:26,borderRadius:50,background:c,border:newCatColor===c?'2px solid #fff':'2px solid transparent',cursor:'pointer',boxShadow:newCatColor===c?`0 0 10px ${c}`:'none',transition:'all 0.2s'}}/>
-                  ))}
-                </div>
+                <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>{catColors.map(c=>(<button key={c} onClick={()=>setNewCatColor(c)} style={{width:26,height:26,borderRadius:50,background:c,border:newCatColor===c?'2px solid #fff':'2px solid transparent',cursor:'pointer',boxShadow:newCatColor===c?`0 0 10px ${c}`:'none',transition:'all 0.2s'}}/>))}</div>
                 <button onClick={addCategory} style={btn}>Add</button>
                 <button onClick={()=>setShowAddCat(false)} style={{...btn,background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',boxShadow:'none'}}>Cancel</button>
               </div>
@@ -715,7 +646,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* ══ ANALYTICS ══ */}
+        {/* ANALYTICS */}
         {activeTab==='analytics'&&(
           <div style={{animation:'fadeUp 0.3s ease'}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20,flexWrap:'wrap',gap:10}}>
@@ -725,7 +656,6 @@ export default function Dashboard() {
                 <button onClick={()=>setAnalyticsPeriod('monthly')} style={periodBtn('monthly')}>🗓️ Monthly</button>
               </div>
             </div>
-
             {total===0&&habits.length===0?(
               <div style={{...card,textAlign:'center',padding:56,border:`1px solid rgba(99,102,241,0.12)`}}>
                 <div style={{fontSize:'3rem',marginBottom:14,fontFamily:EMOJI}}>📊</div>
@@ -775,26 +705,12 @@ export default function Dashboard() {
                   </div>
                   <div style={card}>
                     <h3 style={{margin:'0 0 12px',fontSize:'0.9rem',color:CYAN,fontFamily:EMOJI}}>📌 By Priority</h3>
-                    {['high','medium','low'].map(p=>{
-                      const count=tasks.filter(t=>t.priority===p).length;
-                      return(<div key={p} style={{marginBottom:10}}>
-                        <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}><span style={{fontSize:'0.8rem',color:pColor[p],fontFamily:EMOJI}}>{pEmoji[p]} {p.charAt(0).toUpperCase()+p.slice(1)}</span><span style={{fontSize:'0.8rem',color:'rgba(255,255,255,0.38)',fontWeight:700}}>{count}</span></div>
-                        <div style={{height:6,background:'rgba(255,255,255,0.05)',borderRadius:3}}><div style={{height:'100%',width:`${total>0?(count/total)*100:0}%`,background:`linear-gradient(90deg,${pColor[p]},${CYAN})`,borderRadius:3,transition:'width 0.6s',boxShadow:`0 0 7px ${pColor[p]}50`}}/></div>
-                      </div>);
-                    })}
+                    {['high','medium','low'].map(p=>{const count=tasks.filter(t=>t.priority===p).length;return(<div key={p} style={{marginBottom:10}}><div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}><span style={{fontSize:'0.8rem',color:pColor[p],fontFamily:EMOJI}}>{pEmoji[p]} {p.charAt(0).toUpperCase()+p.slice(1)}</span><span style={{fontSize:'0.8rem',color:'rgba(255,255,255,0.38)',fontWeight:700}}>{count}</span></div><div style={{height:6,background:'rgba(255,255,255,0.05)',borderRadius:3}}><div style={{height:'100%',width:`${total>0?(count/total)*100:0}%`,background:`linear-gradient(90deg,${pColor[p]},${CYAN})`,borderRadius:3,transition:'width 0.6s',boxShadow:`0 0 7px ${pColor[p]}50`}}/></div></div>);})}
                   </div>
                   <div style={card}>
                     <h3 style={{margin:'0 0 12px',fontSize:'0.9rem',color:CYAN,fontFamily:EMOJI}}>🔥 Habit Streaks</h3>
                     {habits.length===0&&<p style={{color:'rgba(255,255,255,0.22)',fontSize:'0.85rem'}}>No habits yet</p>}
-                    {habits.slice(0,5).map(h=>(
-                      <div key={h.id} style={{display:'flex',alignItems:'center',gap:9,marginBottom:9}}>
-                        <span style={{fontFamily:EMOJI,fontSize:'1rem'}}>{h.emoji}</span>
-                        <div style={{flex:1}}>
-                          <div style={{display:'flex',justifyContent:'space-between',marginBottom:3}}><span style={{fontSize:'0.8rem'}}>{h.name}</span><span style={{color:'#f59e0b',fontWeight:700,fontFamily:EMOJI,fontSize:'0.8rem'}}>🔥{h.streak||0}</span></div>
-                          <div style={{height:4,background:'rgba(255,255,255,0.05)',borderRadius:2}}><div style={{height:'100%',width:`${Math.min((h.streak||0)/30*100,100)}%`,background:GRAD,borderRadius:2,boxShadow:`0 0 5px rgba(0,229,255,0.3)`}}/></div>
-                        </div>
-                      </div>
-                    ))}
+                    {habits.slice(0,5).map(h=>(<div key={h.id} style={{display:'flex',alignItems:'center',gap:9,marginBottom:9}}><span style={{fontFamily:EMOJI,fontSize:'1rem'}}>{h.emoji}</span><div style={{flex:1}}><div style={{display:'flex',justifyContent:'space-between',marginBottom:3}}><span style={{fontSize:'0.8rem'}}>{h.name}</span><span style={{color:'#f59e0b',fontWeight:700,fontFamily:EMOJI,fontSize:'0.8rem'}}>🔥{h.streak||0}</span></div><div style={{height:4,background:'rgba(255,255,255,0.05)',borderRadius:2}}><div style={{height:'100%',width:`${Math.min((h.streak||0)/30*100,100)}%`,background:GRAD,borderRadius:2,boxShadow:`0 0 5px rgba(0,229,255,0.3)`}}/></div></div></div>))}
                   </div>
                 </div>
                 {categories.length>0&&(
@@ -805,6 +721,50 @@ export default function Dashboard() {
                 )}
               </>
             )}
+          </div>
+        )}
+
+        {/* PROFILE */}
+        {activeTab==='profile'&&(
+          <div style={{animation:'fadeUp 0.3s ease',maxWidth:520}}>
+            <h2 style={{marginBottom:22,fontSize:'1.15rem',fontWeight:700}}><span style={{fontFamily:EMOJI}}>👤</span> Profile</h2>
+            <div style={{...card,border:'1px solid rgba(99,102,241,0.2)'}}>
+              <div style={{display:'flex',alignItems:'center',gap:18,marginBottom:22,paddingBottom:20,borderBottom:'1px solid rgba(99,102,241,0.1)'}}>
+                <div style={{width:70,height:70,borderRadius:'50%',background:GRAD,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.8rem',fontWeight:800,overflow:'hidden',boxShadow:`0 0 22px rgba(99,102,241,0.35)`,flexShrink:0}}>
+                  {user.profile_pic?<img src={user.profile_pic} alt="av" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{color:'#fff'}}>{(user.name||'U').charAt(0).toUpperCase()}</span>}
+                </div>
+                <div>
+                  <div style={{fontWeight:800,fontSize:'1.15rem',marginBottom:3}}>{user.name||'User'}</div>
+                  <div style={{fontSize:'0.82rem',color:'rgba(255,255,255,0.4)',marginBottom:10}}>{user.email||''}</div>
+                  <div style={{fontSize:'0.72rem',color:'rgba(99,102,241,0.8)',background:'rgba(99,102,241,0.1)',border:'1px solid rgba(99,102,241,0.2)',borderRadius:8,padding:'4px 10px',display:'inline-block'}}>
+                    🏆 Member since {user.created_at?new Date(user.created_at).toLocaleDateString('en-US',{month:'long',year:'numeric'}):'Day 1'}
+                  </div>
+                </div>
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:20}}>
+                {[{label:'Tasks',value:total,icon:'🗒️'},{label:'Done',value:done,icon:'✅'},{label:'Habits',value:habits.length,icon:'🔥'}].map(s=>(
+                  <div key={s.label} style={{background:'rgba(99,102,241,0.08)',borderRadius:10,padding:'12px',textAlign:'center',border:'1px solid rgba(99,102,241,0.12)'}}>
+                    <div style={{fontSize:'1.4rem',fontFamily:EMOJI,marginBottom:4}}>{s.icon}</div>
+                    <div style={{fontSize:'1.3rem',fontWeight:800,background:GRAD,WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>{s.value}</div>
+                    <div style={{fontSize:'0.62rem',color:'rgba(255,255,255,0.3)',fontWeight:600,letterSpacing:'1px'}}>{s.label.toUpperCase()}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{display:'flex',flexDirection:'column',gap:8,marginBottom:20}}>
+                {[{label:'Name',value:user.name||'—'},{label:'Email',value:user.email||'—'},{label:'Notifications',value:notifEnabled?'✅ Enabled':'❌ Disabled',color:notifEnabled?'#10b981':'rgba(255,255,255,0.3)'},{label:'Total Check-ins',value:habits.reduce((a,h)=>a+(h.history?.length||0),0),color:CYAN}].map(row=>(
+                  <div key={row.label} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 14px',background:'rgba(255,255,255,0.03)',borderRadius:9,border:'1px solid rgba(255,255,255,0.06)'}}>
+                    <span style={{color:'rgba(255,255,255,0.4)',fontSize:'0.85rem'}}>{row.label}</span>
+                    <span style={{fontWeight:600,fontSize:'0.85rem',color:row.color||'#fff'}}>{row.value}</span>
+                  </div>
+                ))}
+              </div>
+              <div style={{display:'flex',flexDirection:'column',gap:9}}>
+                <button onClick={()=>window.open('mailto:rithvikkrishna1618@gmail.com?subject=TaskMaster Feedback','_blank')} style={{...btn,width:'100%',justifyContent:'center',display:'flex',gap:8}}>💬 Send Feedback</button>
+                <button onClick={()=>window.open('https://github.com/rithvikkrish/habit-tracker/issues','_blank')} style={{...btn,width:'100%',background:'rgba(99,102,241,0.12)',border:'1px solid rgba(99,102,241,0.25)',boxShadow:'none',justifyContent:'center',display:'flex',gap:8}}>❓ Help & Support</button>
+                {!notifEnabled&&<button onClick={enableNotifications} style={{...btn,width:'100%',background:'rgba(245,158,11,0.12)',border:'1px solid rgba(245,158,11,0.25)',boxShadow:'none',color:'#f59e0b',justifyContent:'center',display:'flex',gap:8}}>🔔 Enable Reminders</button>}
+                <button onClick={logout} style={{width:'100%',padding:'12px',background:'rgba(239,68,68,0.1)',border:'1px solid rgba(239,68,68,0.2)',borderRadius:10,color:'#ef4444',cursor:'pointer',fontFamily:FONT,fontWeight:700,fontSize:'0.9rem',display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>🚪 Logout</button>
+              </div>
+            </div>
           </div>
         )}
 
