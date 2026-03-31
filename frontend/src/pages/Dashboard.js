@@ -21,13 +21,7 @@ function AuthStyleBG() {
     const cv=cvRef.current; const ctx=cv.getContext('2d'); let aid;
     const resize=()=>{ cv.width=window.innerWidth; cv.height=window.innerHeight; };
     resize(); window.addEventListener('resize',resize);
-    const stars=Array.from({length:200},()=>({
-      x:Math.random()*cv.width, y:Math.random()*cv.height,
-      r:Math.random()*1.9+0.3,
-      color:['#ffffff','#c4b5fd','#93c5fd','#67e8f9','#e0e7ff','#a5b4fc'][Math.floor(Math.random()*6)],
-      tw:Math.random()*Math.PI*2, sp:Math.random()*0.008+0.003,
-      pulse:Math.random()>0.6
-    }));
+    const stars=Array.from({length:200},()=>({x:Math.random()*cv.width,y:Math.random()*cv.height,r:Math.random()*1.9+0.3,color:['#ffffff','#c4b5fd','#93c5fd','#67e8f9','#e0e7ff','#a5b4fc'][Math.floor(Math.random()*6)],tw:Math.random()*Math.PI*2,sp:Math.random()*0.008+0.003,pulse:Math.random()>0.6}));
     let shooters=[];
     const spawn=()=>shooters.push({x:Math.random()*cv.width*0.7,y:Math.random()*cv.height*0.4,len:100+Math.random()*80,op:1,spd:6+Math.random()*4,a:Math.PI/4+(Math.random()-0.5)*0.3,color:Math.random()>0.5?CYAN:PURP});
     const fontSize=13;
@@ -156,6 +150,8 @@ export default function Dashboard() {
 
   useEffect(()=>{
     const init=async()=>{
+      // ── FIX 4: Wake ping on dashboard load too ──
+      axios.get(`${BACKEND_URL}/api/`).catch(()=>{});
       setLoading(true);
       await Promise.all([fetchTasks(),fetchCategories(),fetchQuote(),fetchHabits()]);
       setLoading(false);
@@ -318,11 +314,9 @@ export default function Dashboard() {
       <AuthStyleBG/>
       <Confetti active={confetti} onDone={()=>setConfetti(false)}/>
 
-      {/* ── Navbar ── */}
+      {/* Navbar */}
       <nav className="dash-nav" style={{position:'relative',zIndex:10,background:'rgba(8,10,28,0.92)',backdropFilter:'blur(20px)',borderBottom:`1px solid rgba(99,102,241,0.15)`,padding:'0 32px',display:'flex',alignItems:'center',justifyContent:'space-between',height:64,boxShadow:'0 2px 24px rgba(0,0,0,0.6)'}}>
         <span style={{fontWeight:800,fontSize:'clamp(1.1rem,2.5vw,1.4rem)',background:GRAD,WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>⚡ TaskMaster</span>
-
-        {/* Profile dropdown */}
         <div style={{position:'relative'}}>
           <button onClick={()=>setShowProfileMenu(!showProfileMenu)}
             style={{display:'flex',alignItems:'center',gap:9,background:'rgba(99,102,241,0.1)',border:'1px solid rgba(99,102,241,0.2)',borderRadius:24,padding:'5px 14px 5px 5px',cursor:'pointer',transition:'all 0.2s'}}
@@ -332,13 +326,10 @@ export default function Dashboard() {
             <span style={{color:'rgba(255,255,255,0.78)',fontSize:'0.85rem',fontFamily:FONT,fontWeight:600,maxWidth:100,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{user.name||'User'}</span>
             <span style={{color:'rgba(255,255,255,0.35)',fontSize:'0.7rem',display:'inline-block',transition:'transform 0.2s',transform:showProfileMenu?'rotate(180deg)':'none'}}>▼</span>
           </button>
-
           {showProfileMenu&&(
             <>
               <div onClick={()=>setShowProfileMenu(false)} style={{position:'fixed',inset:0,zIndex:19}}/>
               <div style={{position:'absolute',top:'calc(100% + 10px)',right:0,zIndex:20,background:'rgba(10,12,35,0.97)',backdropFilter:'blur(20px)',border:'1px solid rgba(99,102,241,0.2)',borderRadius:14,overflow:'hidden',minWidth:230,boxShadow:'0 16px 48px rgba(0,0,0,0.7)',animation:'slideIn 0.15s ease'}}>
-
-                {/* Header */}
                 <div style={{padding:'14px 18px',borderBottom:'1px solid rgba(99,102,241,0.1)',display:'flex',alignItems:'center',gap:12}}>
                   <Avatar size={40}/>
                   <div style={{overflow:'hidden',flex:1}}>
@@ -346,16 +337,13 @@ export default function Dashboard() {
                     <div style={{fontSize:'0.72rem',color:'rgba(255,255,255,0.35)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{user.email||''}</div>
                   </div>
                 </div>
-
                 <div style={{padding:'6px 0'}}>
                   <MenuItem icon="👤" label="Edit Profile" sub="View your stats & info" onClick={()=>{setShowProfileMenu(false);setActiveTab('profile');}}/>
                   <MenuItem icon="💬" label="Send Feedback" sub="Tell us what you think" onClick={()=>{setShowProfileMenu(false);window.open('mailto:rithvikkrishna1618@gmail.com?subject=TaskMaster Feedback','_blank');}}/>
                   <MenuItem icon="❓" label="Help & Support" sub="GitHub issues" onClick={()=>{setShowProfileMenu(false);window.open('https://github.com/rithvikkrish/habit-tracker/issues','_blank');}}/>
                   <MenuItem icon="🔔" label={notifEnabled?'Reminders On ✓':'Enable Reminders'} sub={notifEnabled?'Streak alerts active':'Get streak alerts'} onClick={()=>{setShowProfileMenu(false);if(!notifEnabled)enableNotifications();}}/>
                 </div>
-
                 <div style={{height:1,background:'rgba(99,102,241,0.12)'}}/>
-
                 <div style={{padding:'6px 0'}}>
                   <MenuItem icon="🚪" label="Logout" color="rgba(239,68,68,0.8)" onClick={()=>{setShowProfileMenu(false);logout();}}/>
                 </div>
