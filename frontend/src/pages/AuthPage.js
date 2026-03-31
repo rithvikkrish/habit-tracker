@@ -47,6 +47,16 @@ export default function AuthPage() {
   const [forgotEmail,setForgotEmail]=useState('');
   const [forgotSent,setForgotSent]=useState(false);
   const [profilePic,setProfilePic]=useState(null);
+  const [serverWaking,setServerWaking]=useState(true);
+
+  // ── FIX 1: Wake backend the moment page opens ──
+  useEffect(()=>{
+    axios.get(`${BACKEND_URL}/api/`)
+      .then(()=>setServerWaking(false))
+      .catch(()=>setServerWaking(false));
+    const t=setTimeout(()=>setServerWaking(false),8000);
+    return()=>clearTimeout(t);
+  },[]);
 
   useEffect(()=>{
     if(window.google)initGoogle();
@@ -60,15 +70,14 @@ export default function AuthPage() {
     if(btn)window.google.accounts.id.renderButton(btn,{theme:'filled_black',size:'large',width:320,text:'continue_with'});
   };
 
+  // ── FIX 2: No fake delays, instant redirect ──
   const handleGoogleCallback=async(response)=>{
     setLoading(true);setLoadMsg('Signing in with Google...');
     try{
       const r=await axios.post(`${BACKEND_URL}/api/auth/google`,{token:response.credential});
       localStorage.setItem('token',r.data.token);
       localStorage.setItem('user',JSON.stringify(r.data.user));
-      setLoadMsg('Loading your workspace...');
-      await new Promise(res=>setTimeout(res,500));
-      window.location.href='/dashboard';
+      window.location.replace('/dashboard');
     }catch{setError('Google sign-in failed. Please try again.');setLoading(false);}
   };
 
@@ -79,9 +88,7 @@ export default function AuthPage() {
       const r=await axios.post(`${BACKEND_URL}/api/auth/login`,{email,password});
       localStorage.setItem('token',r.data.token);
       localStorage.setItem('user',JSON.stringify(r.data.user));
-      setLoadMsg('Loading your workspace...');
-      await new Promise(res=>setTimeout(res,400));
-      window.location.href='/dashboard';
+      window.location.replace('/dashboard');
     }catch{setError('Invalid email or password. Please try again.');setLoading(false);}
   };
 
@@ -93,9 +100,7 @@ export default function AuthPage() {
       const r=await axios.post(`${BACKEND_URL}/api/auth/register`,{email,password,name});
       localStorage.setItem('token',r.data.token);
       localStorage.setItem('user',JSON.stringify(r.data.user));
-      setLoadMsg('Setting up your workspace...');
-      await new Promise(res=>setTimeout(res,500));
-      window.location.href='/dashboard';
+      window.location.replace('/dashboard');
     }catch(err){setError(err.response?.data?.detail||'Registration failed. Please try again.');setLoading(false);}
   };
 
@@ -110,6 +115,7 @@ export default function AuthPage() {
         @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&display=swap');
         @keyframes fadeIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
         @keyframes spin{to{transform:rotate(360deg)}}
+        @keyframes wakePulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.3;transform:scale(0.6)}}
         input::placeholder{color:rgba(255,255,255,0.22);}
         input:focus{border-color:rgba(99,102,241,0.55)!important;box-shadow:0 0 0 3px rgba(99,102,241,0.12);}
         .auth-card{width:100%;max-width:420px;position:relative;z-index:5;animation:fadeIn 0.5s ease;}
@@ -175,6 +181,15 @@ export default function AuthPage() {
                 ))}
               </div>
 
+              {/* ── FIX 3: Server waking banner ── */}
+              {serverWaking&&(
+                <div style={{background:'rgba(245,158,11,0.07)',border:'1px solid rgba(245,158,11,0.18)',borderRadius:10,padding:'9px 14px',marginBottom:16,display:'flex',alignItems:'center',gap:9}}>
+                  <div style={{width:7,height:7,borderRadius:'50%',background:'#f59e0b',flexShrink:0,animation:'wakePulse 1s ease-in-out infinite'}}/>
+                  <span style={{fontSize:'0.8rem',color:'#f59e0b',flex:1}}>Server warming up — first login may take a moment...</span>
+                  <button onClick={()=>setServerWaking(false)} style={{background:'none',border:'none',color:'rgba(245,158,11,0.4)',cursor:'pointer',fontSize:'1rem',padding:0,lineHeight:1,flexShrink:0}}>✕</button>
+                </div>
+              )}
+
               {/* Error */}
               {error&&(
                 <div style={{background:'rgba(239,68,68,0.1)',border:'1px solid rgba(239,68,68,0.25)',borderRadius:10,padding:'10px 14px',marginBottom:16,fontSize:'0.85rem',color:'#fca5a5',display:'flex',alignItems:'center',gap:8}}>
@@ -187,7 +202,6 @@ export default function AuthPage() {
                 <form onSubmit={handleLogin}>
                   <label style={lbl}>EMAIL</label>
                   <input style={{...inp,marginBottom:14}} type="email" placeholder="you@example.com" value={email} onChange={e=>setEmail(e.target.value)} required autoComplete="email"/>
-
                   <label style={lbl}>PASSWORD</label>
                   <div style={{position:'relative',marginBottom:8}}>
                     <input style={{...inp,paddingRight:48}} type={showPw?'text':'password'} placeholder="••••••••" value={password} onChange={e=>setPassword(e.target.value)} required autoComplete="current-password"/>
@@ -195,21 +209,16 @@ export default function AuthPage() {
                       {showPw?'🙈':'👁️'}
                     </button>
                   </div>
-
                   <div style={{textAlign:'right',marginBottom:20}}>
                     <button type="button" onClick={()=>setForgotMode(true)} style={{background:'none',border:'none',color:'rgba(167,139,250,0.8)',cursor:'pointer',fontSize:'0.82rem',fontFamily:FONT,fontWeight:600}}>Forgot password?</button>
                   </div>
-
                   <button type="submit" style={submitBtn}>🚀 Login</button>
-
                   <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:16}}>
                     <div style={{flex:1,height:1,background:'rgba(255,255,255,0.08)'}}/>
                     <span style={{color:'rgba(255,255,255,0.25)',fontSize:'0.8rem'}}>or continue with</span>
                     <div style={{flex:1,height:1,background:'rgba(255,255,255,0.08)'}}/>
                   </div>
-
                   <div id="google-btn" style={{display:'flex',justifyContent:'center',marginBottom:4}}/>
-
                   <div style={{textAlign:'center',marginTop:18,fontSize:'0.85rem',color:'rgba(255,255,255,0.3)'}}>
                     Don't have an account?{' '}
                     <button type="button" onClick={()=>{setTab('signup');setError('');}} style={{background:'none',border:'none',color:'rgba(167,139,250,0.85)',cursor:'pointer',fontFamily:FONT,fontWeight:700,fontSize:'0.85rem'}}>Sign up free</button>
@@ -222,10 +231,8 @@ export default function AuthPage() {
                 <form onSubmit={handleSignup}>
                   <label style={lbl}>FULL NAME</label>
                   <input style={{...inp,marginBottom:14}} type="text" placeholder="Your name" value={name} onChange={e=>setName(e.target.value)} required autoComplete="name"/>
-
                   <label style={lbl}>EMAIL</label>
                   <input style={{...inp,marginBottom:14}} type="email" placeholder="you@example.com" value={email} onChange={e=>setEmail(e.target.value)} required autoComplete="email"/>
-
                   <label style={lbl}>PASSWORD</label>
                   <div style={{position:'relative',marginBottom:14}}>
                     <input style={{...inp,paddingRight:48}} type={showPw?'text':'password'} placeholder="Min 6 characters" value={password} onChange={e=>setPassword(e.target.value)} required autoComplete="new-password"/>
@@ -233,8 +240,6 @@ export default function AuthPage() {
                       {showPw?'🙈':'👁️'}
                     </button>
                   </div>
-
-                  {/* Password strength */}
                   {password.length>0&&(
                     <div style={{marginBottom:16}}>
                       <div style={{display:'flex',gap:4,marginBottom:5}}>
@@ -245,8 +250,6 @@ export default function AuthPage() {
                       </div>
                     </div>
                   )}
-
-                  {/* Profile photo */}
                   <label style={{...lbl,marginBottom:8}}>PROFILE PHOTO <span style={{color:'rgba(255,255,255,0.2)',fontWeight:400,textTransform:'none',letterSpacing:0}}>(optional)</span></label>
                   <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:20}}>
                     <div style={{width:48,height:48,borderRadius:'50%',background:'rgba(99,102,241,0.15)',border:'1px solid rgba(99,102,241,0.25)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.4rem',overflow:'hidden',flexShrink:0}}>
@@ -257,17 +260,13 @@ export default function AuthPage() {
                       <input type="file" accept="image/*" style={{display:'none'}} onChange={e=>{const f=e.target.files[0];if(f){const r=new FileReader();r.onload=ev=>setProfilePic(ev.target.result);r.readAsDataURL(f);}}}/>
                     </label>
                   </div>
-
                   <button type="submit" style={submitBtn}>🎉 Create Account</button>
-
                   <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:16}}>
                     <div style={{flex:1,height:1,background:'rgba(255,255,255,0.08)'}}/>
                     <span style={{color:'rgba(255,255,255,0.25)',fontSize:'0.8rem'}}>or</span>
                     <div style={{flex:1,height:1,background:'rgba(255,255,255,0.08)'}}/>
                   </div>
-
                   <div id="google-btn" style={{display:'flex',justifyContent:'center',marginBottom:4}}/>
-
                   <div style={{textAlign:'center',marginTop:18,fontSize:'0.85rem',color:'rgba(255,255,255,0.3)'}}>
                     Already have an account?{' '}
                     <button type="button" onClick={()=>{setTab('login');setError('');}} style={{background:'none',border:'none',color:'rgba(167,139,250,0.85)',cursor:'pointer',fontFamily:FONT,fontWeight:700,fontSize:'0.85rem'}}>Log in</button>
